@@ -1,0 +1,243 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Onboarder Pro - pre</title>
+    <link rel="stylesheet" href="w3.css" />
+    <link rel="stylesheet" href="dome.css" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Blinker:wght@100;200;300;400;600;700;800;900&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=check_circle,counter_1,counter_2,counter_3" />
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <script>const API_URL = "https://pre-api.example.com";</script>
+</head>
+
+<body>
+    <header>
+        
+<div class="dome-header">
+    <div class="dome-content">
+        <div class="w3-bar">
+            <div class="w3-bar-item padding-right-0">
+                <a href="#">
+                    <img src="assets/logos/DOME_Icon_White.svg" alt="DOME Icon" style="width:100%;max-height:32px">
+                </a>
+            </div>
+            <div class="w3-bar-item">
+                <span class="blinker-semibold w3-xlarge nowrap">DOME MARKETPLACE (pre)</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+    </header>
+
+    <main>
+        <div class="w3-padding-32 dome-content" style="background-color: #EDF2FA;">
+            
+<section class="onboarding-form" x-data="onboarding()" x-cloak>
+
+    <h2 x-text="titles[step]"></h2>
+
+    
+    <div x-show="message" :class="messageType === 'error' ? 'w3-panel w3-red' : 'w3-panel w3-green'">
+        <p x-text="message"></p>
+    </div>
+
+    
+    <div x-show="step === 'email'">
+        <p>Please enter your email to receive a verification code.</p>
+        <form @submit.prevent="sendCode">
+            
+<div class="form-group w3-margin-bottom">
+    <label><b>Email Address</b></label>
+    <input type="email" name="email" x-model="email" class="w3-input w3-border" required>
+</div>
+
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Sending...</span>
+                <span x-show="!loading">Send</span>
+            </button>
+        </form>
+    </div>
+
+    
+    <div x-show="step === 'code'">
+        <p>A code has been sent to <b x-text="email"></b>.</p>
+        <p class="w3-small w3-text-grey"><i>(Simulated: Check the previous screen or logs for the code)</i></p>
+
+        <form @submit.prevent="verifyCode">
+            
+<div class="form-group w3-margin-bottom">
+    <label><b>Verification Code</b></label>
+    <input type="text" name="code" x-model="code" class="w3-input w3-border" required>
+</div>
+
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Verifying...</span>
+                <span x-show="!loading">Verify Code</span>
+            </button>
+            <button type="button" @click="step = 'email'" class="w3-button w3-text-blue w3-margin-top">Back</button>
+        </form>
+    </div>
+
+    
+    <div x-show="step === 'register'">
+        <p>Email verified! Please complete your registration.</p>
+        <form @submit.prevent="register">
+            
+            <div class="form-group w3-margin-bottom">
+                <label><b>Email</b></label>
+                <input type="email" class="w3-input w3-border" :value="email" disabled>
+            </div>
+
+            
+<div class="form-group w3-margin-bottom">
+    <label><b>First Name</b></label>
+    <input type="text" name="firstName" x-model="formData.firstName" class="w3-input w3-border" required>
+</div>
+
+            
+<div class="form-group w3-margin-bottom">
+    <label><b>Last Name</b></label>
+    <input type="text" name="lastName" x-model="formData.lastName" class="w3-input w3-border" required>
+</div>
+
+            
+<div class="form-group w3-margin-bottom">
+    <label><b>Company Name</b></label>
+    <input type="text" name="companyName" x-model="formData.companyName" class="w3-input w3-border" required>
+</div>
+
+            
+<div class="form-group w3-margin-bottom">
+    <label><b>Country of Incorporation</b></label>
+    <input type="text" name="country" x-model="formData.country" class="w3-input w3-border" required>
+</div>
+
+            
+<div class="form-group w3-margin-bottom">
+    <label><b>VAT ID</b></label>
+    <input type="text" name="vatId" x-model="formData.vatId" class="w3-input w3-border" required>
+</div>
+
+
+            
+            <input type="text" name="website" x-model="formData.website" style="display:none" tabindex="-1"
+                autocomplete="off">
+
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Registering...</span>
+                <span x-show="!loading">Complete Registration</span>
+            </button>
+        </form>
+    </div>
+
+</section>
+
+<script>
+    function onboarding() {
+        return {
+            step: 'email',
+            email: '',
+            code: '',
+            formData: {
+                firstName: '',
+                lastName: '',
+                companyName: '',
+                country: '',
+                vatId: '',
+                website: '' 
+            },
+            loading: false,
+            message: '',
+            messageType: '',
+            titles: {
+                'email': 'Welcome to Onboarding',
+                'code': 'Verify Your Email',
+                'register': 'Company Details'
+            },
+
+            async callApi(endpoint, body) {
+                this.loading = true;
+                this.message = '';
+                try {
+                    const res = await fetch(API_URL + endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest' 
+                        },
+                        body: JSON.stringify(body)
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        throw new Error(data.message || 'Unknown error');
+                    }
+                    return data;
+                } catch (err) {
+                    this.message = err.message;
+                    this.messageType = 'error';
+                    return null;
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async sendCode() {
+                const data = await this.callApi('/api/validate-email', { email: this.email });
+                if (data) {
+                    this.message = `Code sent! (Dev hint: ${data.data.code})`;
+                    this.messageType = 'success';
+                    
+                    setTimeout(() => {
+                        this.step = 'code';
+                        this.message = '';
+                    }, 5000);
+                }
+            },
+
+            async verifyCode() {
+                const data = await this.callApi('/api/verify-code', { email: this.email, code: this.code });
+                if (data) {
+                    this.step = 'register';
+                    this.message = '';
+                }
+            },
+
+            async register() {
+                
+                const body = { ...this.formData, email: this.email };
+                const data = await this.callApi('/api/register', body);
+                if (data) {
+                    this.message = 'Registration successful! (End of flow for now)';
+                    this.messageType = 'success';
+                    
+                }
+            }
+        }
+    }
+</script>
+
+        </div>
+    </main>
+
+    <footer>
+        <div class="dome-content">
+            
+            <div style="background: yellow;">DEBUG MODE ON</div>
+            
+        </div>
+    </footer>
+
+</body>
+
+</html>

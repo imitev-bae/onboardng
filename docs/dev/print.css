@@ -1,0 +1,33 @@
+@page {
+  size: A4 portrait;
+  margin-top: 20mm;
+  margin-left: 25mm;
+  margin-right: 20mm;
+  margin-bottom: 20mm;
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url("./fonts/Roboto-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url("./fonts/Roboto-Medium.ttf") format("truetype");
+  font-weight: 450 500;
+}
+
+.onlyscreen {
+  display: none;
+}
+.w3-card-2 {
+  box-shadow: none;
+}
+
+.pagebreak { page-break-before: always; }
+
+.signature { break-inside: avoid;}
+
+.forprint {
+  font-family: system-ui, sans-serif;
+}

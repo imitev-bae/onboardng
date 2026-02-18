@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "**/src/layouts/*.html": "handlebars",
+        "**/src/pages/*.html": "handlebars"
+    },
+    "editor.fontSize": 15
+}
