@@ -1,0 +1,43 @@
+dest_dir: "docs"
+src_dir: "src"
+app_name: "Onboarder Pro"
+environments:
+
+  dev:
+    api_url: "http://localhost:3000"
+    debug: true
+    privateKeyFile: "../config/development/sbx_didkey_priv.txt"
+    machineCredentialFile: "../config/development/sbx_lear_credential_machine.txt"
+    mydidkey: "did:key:zDnaeajw3FmMgsGJxWggMLbXFgr7yoeTBKBsPAdErbLpSFLZt"
+
+    verifier:
+      url: "https://verifier.dome-marketplace-sbx.org"
+      token_endpoint: "https://verifier.dome-marketplace-sbx.org/oidc/token"
+    issuer:
+      credentialIssuancePath: "https://issuer.dome-marketplace-sbx.org/vci/v1/issuances"
+
+  pre:
+    api_url: "https://pre-api.example.com"
+    debug: true
+    privateKeyFile: "../config/preproduction/pre_didkey_priv.txt"
+    machineCredentialFile: "../config/preproduction/pre_lear_credential_machine.txt"
+    mydidkey: "did:key:zDnaeb3th2TDPrQTnM19Mdy543xFetwCpqjmcGBFgisqYKuL4"
+
+    verifier:
+      url: "https://verifier.dome-marketplace-sbx.org"
+      token_endpoint: "https://verifier.dome-marketplace-sbx.org/oidc/token"
+    issuer:
+      credentialIssuancePath: "https://issuer.dome-marketplace-sbx.org/vci/v1/issuances"
+
+  pro:
+    api_url: "https://api.example.com"
+    debug: false
+    privateKeyFile: "../config/production/prod_didkey_priv.txt"
+    machineCredentialFile: "../config/production/prod_lear_credential_machine.txt"
+    mydidkey: "did:key:zDnaehBC97ZSEc6cwHLXXr6Zfrj1Tv9bxtsuFGPkxcXMj6FaZ"
+
+    verifier:
+      url: "https://verifier.dome-marketplace.eu"
+      token_endpoint: "https://verifier.dome-marketplace.eu/oidc/token"
+    issuer:
+      credentialIssuancePath: "https://issuer.dome-marketplace.eu/vci/v1/issuances"

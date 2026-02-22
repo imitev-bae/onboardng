@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hesusruiz/onboardng/common"
 	"github.com/hesusruiz/onboardng/credissuance"
 )
 
@@ -81,9 +82,10 @@ func generate(cfg Config) {
 			outputFile, _ := os.Create(filepath.Join(targetDir, pageBase))
 
 			templateData := map[string]interface{}{
-				"AppName": cfg.AppName,
-				"Env":     envName,
-				"Vars":    envVars,
+				"AppName":   cfg.AppName,
+				"Env":       envName,
+				"Vars":      envVars,
+				"Countries": common.Countries,
 			}
 
 			// We execute "layout.html" which should include "content" (defined in the page)

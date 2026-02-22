@@ -7,17 +7,17 @@ func Cred1() *LEARIssuanceRequestBody {
 		Format:        "jwt_vc_json",
 		Payload: Payload{
 			Mandator: Mandator{
-				OrganizationIdentifier: "",
-				Organization:           "",
-				Country:                "",
-				CommonName:             "",
-				EmailAddress:           "",
+				OrganizationIdentifier: "VATES-123456",
+				Organization:           "Test Organization",
+				Country:                "ES",
+				CommonName:             "Test User",
+				EmailAddress:           "jesus@alastria.io",
 			},
 			Mandatee: Mandatee{
-				FirstName:   "",
-				LastName:    "",
-				Nationality: "",
-				Email:       "",
+				FirstName:   "Test",
+				LastName:    "User",
+				Nationality: "ES",
+				Email:       "jesus@alastria.io",
 			},
 			Power: []Power{
 				{

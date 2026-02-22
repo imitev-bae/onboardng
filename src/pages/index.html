@@ -24,7 +24,10 @@
     <!-- Step 2: Verification Code -->
     <div x-show="step === 'code'">
         <p>A code has been sent to <b x-text="email"></b>.</p>
-        <p class="w3-small w3-text-grey"><i>(Simulated: Check the previous screen or logs for the code)</i></p>
+        <div class="w3-panel w3-yellow">
+            <p><strong>Note:</strong> For testing, we show here the code: <strong><span
+                        x-text="codeValue"></span></strong></p>
+        </div>
 
         <form @submit.prevent="verifyCode">
             {{template "input-component" dict "Label" "Verification Code" "Name" "code" "Model" "code" "Type" "text"}}
@@ -50,7 +53,7 @@
             {{template "input-component" dict "Label" "First Name" "Name" "firstName" "Model" "formData.firstName" "Type" "text"}}
             {{template "input-component" dict "Label" "Last Name" "Name" "lastName" "Model" "formData.lastName" "Type" "text"}}
             {{template "input-component" dict "Label" "Company Name" "Name" "companyName" "Model" "formData.companyName" "Type" "text"}}
-            {{template "input-component" dict "Label" "Country of Incorporation" "Name" "country" "Model" "formData.country" "Type" "text"}}
+            {{template "country-select" dict "Label" "Country of Incorporation" "Name" "country" "Model" "formData.country" "Countries" .Countries}}
             {{template "input-component" dict "Label" "VAT ID" "Name" "vatId" "Model" "formData.vatId" "Type" "text"}}
 
             <!-- Honeypot -->
@@ -84,8 +87,9 @@
             loading: false,
             message: '',
             messageType: '',
+            codeValue: '',
             titles: {
-                'email': 'Welcome to Onboarding',
+                'email': 'Register in DOME Marketplace',
                 'code': 'Verify Your Email',
                 'register': 'Company Details'
             },
@@ -119,13 +123,9 @@
             async sendCode() {
                 const data = await this.callApi('/api/validate-email', { email: this.email });
                 if (data) {
-                    this.message = `Code sent! (Dev hint: ${data.data.code})`;
-                    this.messageType = 'success';
-                    // Wait a moment so user sees the message
-                    setTimeout(() => {
-                        this.step = 'code';
-                        this.message = '';
-                    }, 5000);
+                    // Just for testing
+                    this.codeValue = data.data.code;
+                    this.step = 'code';
                 }
             },
 

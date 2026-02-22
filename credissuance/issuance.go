@@ -3,13 +3,16 @@ package credissuance
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/x509"
+	"crypto/elliptic"
+	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
+
+	"github.com/mr-tron/base58/base58"
 )
 
 type LEARIssuanceRequestBody struct {
@@ -17,7 +20,7 @@ type LEARIssuanceRequestBody struct {
 	OperationMode string  `json:"operation_mode,omitempty"`
 	Format        string  `json:"format,omitempty"`
 	ResponseUri   string  `json:"response_uri,omitempty"`
-	Payload       Payload `json:"payload,omitempty"`
+	Payload       Payload `json:"payload"`
 }
 
 func ParseLEARIssuanceRequestBody(body []byte) (*LEARIssuanceRequestBody, error) {
@@ -74,12 +77,12 @@ type Config struct {
 	ApiUrl string `yaml:"api_url"`
 	Debug  bool   `yaml:"debug"`
 
-	PrivateKeyFilePEM     string `yaml:"privateKeyFilePEM,omitempty"`
-	MachineCredentialFile string `yaml:"machineCredentialFile,omitempty"`
-
-	MyDidkey string         `yaml:"mydidkey,omitempty"`
-	Verifier VerifierConfig `yaml:"verifier"`
-	Issuer   IssuerConfig   `yaml:"issuer"`
+	PrivateKeyFile        string         `yaml:"privateKeyFile,omitempty"`
+	MachineCredentialFile string         `yaml:"machineCredentialFile,omitempty"`
+	MyDidkey              string         `yaml:"mydidkey,omitempty"`
+	Verifier              VerifierConfig `yaml:"verifier"`
+	Issuer                IssuerConfig   `yaml:"issuer"`
+	SMTP                  SMTPConfig     `yaml:"smtp"`
 }
 
 type VerifierConfig struct {
@@ -104,18 +107,54 @@ type LEARIssuance struct {
 func NewLEARIssuance(config Config) (*LEARIssuance, error) {
 
 	// Read the private key
-	pemBytesRaw, err := os.ReadFile(config.PrivateKeyFilePEM)
+	pemBytesRaw, err := os.ReadFile(config.PrivateKeyFile)
 	if err != nil {
 		return nil, err
 	}
 
-	// Decode from the PEM format
-	pemBlock, _ := pem.Decode(pemBytesRaw)
-	privKeyAny, err := x509.ParsePKCS8PrivateKey(pemBlock.Bytes)
+	// Strip any '0x' or '0X' prefix from the key and decode it
+	hexKey := strings.TrimPrefix(string(pemBytesRaw), "0x")
+	hexKey = strings.TrimPrefix(hexKey, "0X")
+	dBytes, _ := hex.DecodeString(hexKey)
+
+	// Create ECDSA Private Key from the raw private key
+	curve := elliptic.P256()
+	privateKey, err := ecdsa.ParseRawPrivateKey(curve, dBytes)
 	if err != nil {
 		return nil, err
 	}
-	privateKey := privKeyAny.(*ecdsa.PrivateKey)
+
+	// For safety, we are going to derive the associated did:key and compare to the one in the config
+	// We have to represent the public key as a compressed array of bytes,
+	// and then apply the encoding for did:key.
+
+	// This is the uncompressed public key
+	uncompressed, err := privateKey.PublicKey.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract X and Y from the slice
+	// X is bytes [1:33], Y is bytes [33:65]
+	xBytes := uncompressed[1:33]
+	yLastByte := uncompressed[64]
+
+	// Determine the compressedPrefix (0x02 if Y is even, 0x03 if Y is odd)
+	var compressedPrefix byte = 0x02
+	if yLastByte%2 != 0 {
+		compressedPrefix = 0x03
+	}
+
+	// Construct the 33-byte compressed key
+	compressedBytes := append([]byte{compressedPrefix}, xBytes...)
+
+	// Compress the public key for the DID
+	varintPrefix := []byte{0x80, 0x24} // Varint for P-256
+	didKey := "did:key:z" + base58.Encode(append(varintPrefix, compressedBytes...))
+
+	if didKey != config.MyDidkey {
+		return nil, fmt.Errorf("the private key does not correspond to the did:key in the configuration")
+	}
 
 	// Read the LEARCredentialMachine
 	buf, err := os.ReadFile(config.MachineCredentialFile)

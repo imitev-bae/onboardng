@@ -38,8 +38,9 @@
     </header>
 
     <main>
-        <div class="w3-padding-32 dome-content" style="background-color: #EDF2FA;">
-            
+        <div style="background-color: #EDF2FA; min-height: 100vh;">
+            <div class="w3-padding-32 dome-content">
+                
 <section class="onboarding-form" x-data="onboarding()" x-cloak>
 
     <h2 x-text="titles[step]"></h2>
@@ -70,7 +71,10 @@
     
     <div x-show="step === 'code'">
         <p>A code has been sent to <b x-text="email"></b>.</p>
-        <p class="w3-small w3-text-grey"><i>(Simulated: Check the previous screen or logs for the code)</i></p>
+        <div class="w3-panel w3-yellow">
+            <p><strong>Note:</strong> For testing, we show here the code: <strong><span
+                        x-text="codeValue"></span></strong></p>
+        </div>
 
         <form @submit.prevent="verifyCode">
             
@@ -119,7 +123,70 @@
             
 <div class="form-group w3-margin-bottom">
     <label><b>Country of Incorporation</b></label>
-    <input type="text" name="country" x-model="formData.country" class="w3-input w3-border" required>
+    <select name="country" x-model="formData.country" class="w3-select w3-border" required>
+        <option value="" disabled selected>Select a country</option>
+        
+        <option value="US">United States</option>
+        
+        <option value="GB">United Kingdom</option>
+        
+        <option value="CA">Canada</option>
+        
+        <option value="AU">Australia</option>
+        
+        <option value="DE">Germany</option>
+        
+        <option value="FR">France</option>
+        
+        <option value="ES">Spain</option>
+        
+        <option value="IT">Italy</option>
+        
+        <option value="NL">Netherlands</option>
+        
+        <option value="BE">Belgium</option>
+        
+        <option value="CH">Switzerland</option>
+        
+        <option value="AT">Austria</option>
+        
+        <option value="SE">Sweden</option>
+        
+        <option value="NO">Norway</option>
+        
+        <option value="DK">Denmark</option>
+        
+        <option value="FI">Finland</option>
+        
+        <option value="IE">Ireland</option>
+        
+        <option value="PT">Portugal</option>
+        
+        <option value="GR">Greece</option>
+        
+        <option value="LU">Luxembourg</option>
+        
+        <option value="JP">Japan</option>
+        
+        <option value="CN">China</option>
+        
+        <option value="IN">India</option>
+        
+        <option value="BR">Brazil</option>
+        
+        <option value="MX">Mexico</option>
+        
+        <option value="ZA">South Africa</option>
+        
+        <option value="AE">United Arab Emirates</option>
+        
+        <option value="SG">Singapore</option>
+        
+        <option value="KR">South Korea</option>
+        
+        <option value="NZ">New Zealand</option>
+        
+    </select>
 </div>
 
             
@@ -160,8 +227,9 @@
             loading: false,
             message: '',
             messageType: '',
+            codeValue: '',
             titles: {
-                'email': 'Welcome to Onboarding',
+                'email': 'Register in DOME Marketplace',
                 'code': 'Verify Your Email',
                 'register': 'Company Details'
             },
@@ -195,13 +263,9 @@
             async sendCode() {
                 const data = await this.callApi('/api/validate-email', { email: this.email });
                 if (data) {
-                    this.message = `Code sent! (Dev hint: ${data.data.code})`;
-                    this.messageType = 'success';
                     
-                    setTimeout(() => {
-                        this.step = 'code';
-                        this.message = '';
-                    }, 5000);
+                    this.codeValue = data.data.code;
+                    this.step = 'code';
                 }
             },
 
@@ -227,6 +291,7 @@
     }
 </script>
 
+            </div>
         </div>
     </main>
 

@@ -1,21 +1,31 @@
 dest_dir: "docs"
 src_dir: "src"
-app_name: "Onboarder Pro"
+app_name: "Onboarding"
+
+
+
 environments:
 
   dev:
     api_url: "http://localhost:3000"
     debug: true
-    privateKeyFilePEM: "config/credentials/development/sbx_didkey_priv.pem"
+    privateKeyFile: "config/credentials/development/sbx_didkey_priv.txt"
     machineCredentialFile: "config/credentials/development/sbx_lear_credential_machine.txt"
-    mydidkey: "did:key:zDnaeb3th2TDPrQTnM19Mdy543xFetwCpqjmcGBFgisqYKuL4"
+    mydidkey: "did:key:zDnaeajw3FmMgsGJxWggMLbXFgr7yoeTBKBsPAdErbLpSFLZt"
 
     verifier:
       url: "https://verifier.dome-marketplace-sbx.org"
       token_endpoint: "https://verifier.dome-marketplace-sbx.org/oidc/token"
     issuer:
-      credentialIssuancePath: "https://issuer.dome-marketplace-sbx.org/issuer-api/vci/v1/issuances/external"
+      credentialIssuancePath: "https://issuer.dome-marketplace-sbx.org/vci/v1/issuances"
 
+    smtp:
+      enabled: true
+      host: "smtp.ionos.de"
+      port: 465
+      tls: true
+      username: "onboarding@dome-marketplace.eu"
+      passwordFile: "config/credentials/production/prod_smtppassword.txt"
 
 
   pre:
