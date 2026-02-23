@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/hesusruiz/onboardng/internal/configuration"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,10 +33,10 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 type TestConfig struct {
-	DestDir      string            `yaml:"dest_dir"`
-	SrcDir       string            `yaml:"src_dir"`
-	AppName      string            `yaml:"app_name"`
-	Environments map[string]Config `yaml:"environments"`
+	DestDir      string                             `yaml:"dest_dir"`
+	SrcDir       string                             `yaml:"src_dir"`
+	AppName      string                             `yaml:"app_name"`
+	Environments map[string]configuration.EnvConfig `yaml:"environments"`
 }
 
 func TestLEARIssuanceRequest(t *testing.T) {
@@ -54,15 +55,15 @@ func TestLEARIssuanceRequest(t *testing.T) {
 	envCfg := cfg.Environments["dev"]
 
 	// Setup issuer
-	issuerCfg := Config{
+	issuerCfg := configuration.EnvConfig{
 		PrivateKeyFile:        envCfg.PrivateKeyFile,
 		MachineCredentialFile: envCfg.MachineCredentialFile,
 		MyDidkey:              envCfg.MyDidkey,
-		Verifier: VerifierConfig{
+		Verifier: configuration.VerifierConfig{
 			URL:           envCfg.Verifier.URL,
 			TokenEndpoint: envCfg.Verifier.TokenEndpoint,
 		},
-		Issuer: IssuerConfig{
+		Issuer: configuration.IssuerConfig{
 			CredentialIssuancePath: envCfg.Issuer.CredentialIssuancePath,
 		},
 	}

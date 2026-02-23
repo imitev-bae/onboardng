@@ -10,17 +10,10 @@ import (
 	"path/filepath"
 
 	"github.com/hesusruiz/onboardng/common"
-	"github.com/hesusruiz/onboardng/credissuance"
+	"github.com/hesusruiz/onboardng/internal/configuration"
 )
 
-type Config struct {
-	DestDir      string                         `yaml:"dest_dir"`
-	SrcDir       string                         `yaml:"src_dir"`
-	AppName      string                         `yaml:"app_name"`
-	Environments map[string]credissuance.Config `yaml:"environments"`
-}
-
-func generate(cfg Config) {
+func generate(cfg configuration.Config) error {
 	// Parse all layouts first
 	layoutTmpl, err := template.New("").Funcs(template.FuncMap{
 		"safe": func(s string) template.JS {
@@ -44,14 +37,14 @@ func generate(cfg Config) {
 	}).ParseGlob(filepath.Join(cfg.SrcDir, "layouts/*.html"))
 	if err != nil {
 		slog.Error("❌ Layout Template Error", "error", err)
-		return
+		return err
 	}
 
 	// Find all pages
 	pages, err := filepath.Glob(filepath.Join(cfg.SrcDir, "pages/*.html"))
 	if err != nil {
 		slog.Error("❌ Page Glob Error", "error", err)
-		return
+		return err
 	}
 
 	for envName, envVars := range cfg.Environments {
@@ -92,11 +85,14 @@ func generate(cfg Config) {
 			err = tmpl.ExecuteTemplate(outputFile, "layout.html", templateData)
 			if err != nil {
 				slog.Error("❌ Template Execution Error", "page", page, "error", err)
+				outputFile.Close() // Ensure file is closed on error
+				return err
 			}
 			outputFile.Close()
 		}
 	}
 	slog.Info("✅ Assets copied and HTML pages regenerated.")
+	return nil
 }
 
 // copyFile is a helper to move assets to the destination

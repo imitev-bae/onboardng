@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/mr-tron/base58/base58"
 )
 
@@ -73,27 +74,6 @@ func (s Strings) MarshalJSON() (b []byte, err error) {
 	return json.Marshal([]string(s))
 }
 
-type Config struct {
-	ApiUrl string `yaml:"api_url"`
-	Debug  bool   `yaml:"debug"`
-
-	PrivateKeyFile        string         `yaml:"privateKeyFile,omitempty"`
-	MachineCredentialFile string         `yaml:"machineCredentialFile,omitempty"`
-	MyDidkey              string         `yaml:"mydidkey,omitempty"`
-	Verifier              VerifierConfig `yaml:"verifier"`
-	Issuer                IssuerConfig   `yaml:"issuer"`
-	SMTP                  SMTPConfig     `yaml:"smtp"`
-}
-
-type VerifierConfig struct {
-	URL           string `yaml:"url,omitempty"`
-	TokenEndpoint string `yaml:"token_endpoint,omitempty"`
-}
-
-type IssuerConfig struct {
-	CredentialIssuancePath string `yaml:"credentialIssuancePath,omitempty"`
-}
-
 type LEARIssuance struct {
 	privateKey        *ecdsa.PrivateKey
 	machineCredential string
@@ -104,7 +84,7 @@ type LEARIssuance struct {
 	credentialIssuancePath string
 }
 
-func NewLEARIssuance(config Config) (*LEARIssuance, error) {
+func NewLEARIssuance(config configuration.EnvConfig) (*LEARIssuance, error) {
 
 	// Read the private key
 	pemBytesRaw, err := os.ReadFile(config.PrivateKeyFile)

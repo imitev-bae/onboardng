@@ -2,15 +2,13 @@ dest_dir: "docs"
 src_dir: "src"
 app_name: "Onboarding"
 
-
-
 environments:
 
   dev:
     api_url: "http://localhost:3000"
     debug: true
-    privateKeyFile: "config/credentials/development/sbx_didkey_priv.txt"
-    machineCredentialFile: "config/credentials/development/sbx_lear_credential_machine.txt"
+    privateKeyFile: "config/development/sbx_didkey_priv.txt"
+    machineCredentialFile: "config/development/sbx_lear_credential_machine.txt"
     mydidkey: "did:key:zDnaeajw3FmMgsGJxWggMLbXFgr7yoeTBKBsPAdErbLpSFLZt"
 
     verifier:
@@ -19,18 +17,18 @@ environments:
     issuer:
       credentialIssuancePath: "https://issuer.dome-marketplace-sbx.org/vci/v1/issuances"
 
-    smtp:
-      enabled: true
-      host: "smtp.ionos.de"
-      port: 465
-      tls: true
-      username: "onboarding@dome-marketplace.eu"
-      passwordFile: "config/credentials/production/prod_smtppassword.txt"
+    mail:
+      onboard_team_email:
+        - "jesus.ruiz@in2.es"
+      issuer_team_email:
+        - "hesus.ruiz@gmail.com"
+      cc_list_email:
+        - "jesus@alastria.io"
+      smtp:
+        enabled: true
+        host: "smtp.ionos.de"
+        port: 465
+        tls: true
+        username: "onboarding@dome-marketplace.eu"
+        passwordFile: "config/development/smtppassword.txt"
 
-
-  pre:
-    api_url: "https://pre-api.example.com"
-    debug: true
-  pro:
-    api_url: "https://api.example.com"
-    debug: false

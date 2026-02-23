@@ -1,7 +1,7 @@
 {{define "content"}}
 <section class="onboarding-form" x-data="onboarding()" x-cloak>
 
-    <h2 x-text="titles[step]"></h2>
+    <h2 class="form-title" x-text="titles[step]"></h2>
 
     <!-- Error/Success Messages -->
     <div x-show="message" :class="messageType === 'error' ? 'w3-panel w3-red' : 'w3-panel w3-green'">
@@ -12,7 +12,11 @@
     <div x-show="step === 'email'">
         <p>Please enter your email to receive a verification code.</p>
         <form @submit.prevent="sendCode">
-            {{template "input-component" dict "Label" "Email Address" "Name" "email" "Model" "email" "Type" "email"}}
+            <div class="w3-row">
+                <div class="w3-third">
+                    {{template "input-component" dict "Label" "Email (*)" "Name" "email" "Model" "email" "Type" "email"}}
+                </div>
+            </div>
             <button type="submit" :disabled="loading"
                 class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
                 <span x-show="loading">Sending...</span>
@@ -30,13 +34,16 @@
         </div>
 
         <form @submit.prevent="verifyCode">
-            {{template "input-component" dict "Label" "Verification Code" "Name" "code" "Model" "code" "Type" "text"}}
+            <div class="w3-row">
+                <div class="w3-third">
+                    {{template "input-component" dict "Label" "Verification Code (*)" "Name" "code" "Model" "code" "Type" "text"}}
+                </div>
+            </div>
             <button type="submit" :disabled="loading"
                 class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
                 <span x-show="loading">Verifying...</span>
                 <span x-show="!loading">Verify Code</span>
             </button>
-            <button type="button" @click="step = 'email'" class="w3-button w3-text-blue w3-margin-top">Back</button>
         </form>
     </div>
 
@@ -44,21 +51,55 @@
     <div x-show="step === 'register'">
         <p>Email verified! Please complete your registration.</p>
         <form @submit.prevent="register">
-            <!-- Email is now read-only -->
-            <div class="form-group w3-margin-bottom">
-                <label><b>Email</b></label>
-                <input type="email" class="w3-input w3-border" :value="email" disabled>
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    <!-- Email is now read-only -->
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="w3-input w3-border" :value="email" disabled>
+                    </div>
+
+                </div>
+
+                <div class="w3-third">
+                    {{template "input-component" dict "Label" "First Name (*)" "Name" "firstName" "Model" "formData.firstName" "Type" "text"}}
+                </div>
+
+                <div class="w3-third">
+                    {{template "input-component" dict "Label" "Last Name (*)" "Name" "lastName" "Model" "formData.lastName" "Type" "text"}}
+                </div>
+
             </div>
 
-            {{template "input-component" dict "Label" "First Name" "Name" "firstName" "Model" "formData.firstName" "Type" "text"}}
-            {{template "input-component" dict "Label" "Last Name" "Name" "lastName" "Model" "formData.lastName" "Type" "text"}}
-            {{template "input-component" dict "Label" "Company Name" "Name" "companyName" "Model" "formData.companyName" "Type" "text"}}
-            {{template "country-select" dict "Label" "Country of Incorporation" "Name" "country" "Model" "formData.country" "Countries" .Countries}}
-            {{template "input-component" dict "Label" "VAT ID" "Name" "vatId" "Model" "formData.vatId" "Type" "text"}}
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    {{template "input-component" dict "Label" "Company Name (*)" "Name" "companyName" "Model" "formData.companyName" "Type" "text"}}
+                </div>
+                <div class="w3-third">
+                    {{template "country-select" dict "Label" "Country of Incorporation (*)" "Name" "country" "Model" "formData.country" "Countries" .Countries}}
+                </div>
+                <div class="w3-third">
+                    {{template "input-component" dict "Label" "VAT ID (*)" "Name" "vatId" "Model" "formData.vatId" "Type" "text"}}
+                </div>
+            </div>
 
             <!-- Honeypot -->
             <input type="text" name="website" x-model="formData.website" style="display:none" tabindex="-1"
                 autocomplete="off">
+
+            <p class=""><span class=""><b>Information about the processing of personal data is as follows:</b> <a
+                        target="_blank" href="https://dome-project.eu/about/#partners">Data Controller DOME
+                        Marketplace</a>.
+                    Purpose: to send you information about DOME's project by electronic means. Legal basis: data
+                    subject's consent.
+                    Recipients: The personal data collected will not be communicated to third parties, unless requested
+                    by public administrations or if required by law. Exercise of Rights: sending an email to <a
+                        href="mailto:privacy.helpdesk@dome-project.eu">privacy.helpdesk@dome-project.eu</a>,
+                    indicating in the subject line: 'Exercise of rights'. You are also entitled to be assisted by a Data
+                    Protection Authority. Find more information about personal data processing in <a target="_blank"
+                        href="https://dome-marketplace-sbx.org/assets/documents/privacy.pdf">our Privacy Policy
+                        here</a>. </span></p>
 
             <button type="submit" :disabled="loading"
                 class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
@@ -91,7 +132,7 @@
             titles: {
                 'email': 'Register in DOME Marketplace',
                 'code': 'Verify Your Email',
-                'register': 'Company Details'
+                'register': 'Please fill this form to register'
             },
 
             async callApi(endpoint, body) {
@@ -142,7 +183,7 @@
                 const body = { ...this.formData, email: this.email };
                 const data = await this.callApi('/api/register', body);
                 if (data) {
-                    this.message = 'Registration successful! (End of flow for now)';
+                    this.message = 'Registration successful! Your registration is being processed.';
                     this.messageType = 'success';
                     // Reset or redirect could happen here
                 }
@@ -154,7 +195,7 @@
 
 {{define "input-component"}}
 <div class="form-group w3-margin-bottom">
-    <label><b>{{.Label}}</b></label>
+    <label class="form-label">{{.Label}}</label>
     <input type="{{.Type}}" name="{{.Name}}" x-model="{{.Model}}" class="w3-input w3-border" required>
 </div>
 {{end}}

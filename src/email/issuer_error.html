@@ -1,0 +1,72 @@
+{{define "content"}}
+<div
+    style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; border: 1px solid #fee2e2; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+
+    <!-- Hero Status Header -->
+    <div style="background-color: #dc2626; padding: 24px; text-align: center; color: #ffffff;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+            Credential Issuance Failure</h2>
+        <h2 style="margin: 0; font-size: 20px; font-weight: 700;">
+            Manual Action Required - Altia Team</h2>
+    </div>
+
+    <!-- Test Environment Warning -->
+    {{if ne .Runtime "pro"}}
+    <div
+        style="background-color: #fff7ed; border-bottom: 1px solid #ffedd5; padding: 16px 24px; color: #9a3412; font-size: 14px;">
+        <p style="margin: 0; font-weight: 700;">⚠️ DEVELOPMENT/TEST NOTICE ({{.Runtime}})</p>
+        <p style="margin: 4px 0 0 0; line-height: 1.4;">This is a test notification. In production, this error indicates
+            a critical system failure that must be addressed immediately by the team responsible for the Credential
+            Issuer.</p>
+    </div>
+    {{end}}
+
+    <!-- Main Body -->
+    <div style="padding: 32px; color: #1e293b; line-height: 1.6;">
+        <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin-bottom: 24px;">
+            <p style="margin: 0; font-weight: 600; color: #991b1b;">A registration error occurred because the Credential
+                Issuer is not responding as expected.</p>
+        </div>
+
+        <p style="font-size: 15px;">The customer registration has been saved to the database, but <strong>manual
+                credential generation is required</strong> to complete their onboarding process.</p>
+
+        <!-- Registration Info -->
+        <div style="margin: 32px 0;">
+            <div
+                style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">
+                Registration Number</div>
+            <div
+                style="font-family: ui-monospace, sans-serif; font-size: 18px; font-weight: 700; color: #1e293b; background: #f8fafc; padding: 10px; border-radius: 12px;">
+                {{.RegistrationID}}
+            </div>
+        </div>
+
+        <h3 style="font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px;">Customer Payload
+            Information:</h3>
+        <p style="font-size: 14px; color: #64748b; margin-bottom: 12px;">Please use the following data to manually issue
+            the credential:</p>
+
+        <div style="background-color: #1e293b; border-radius: 8px; padding: 20px; overflow-x: auto;">
+            <pre
+                style="margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; color: #34d399; white-space: pre-wrap; word-break: break-all;">{{.Payload}}
+            </pre>
+        </div>
+
+        <div
+            style="margin-top: 32px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #f8fafc;">
+            <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #1e293b;">Next Steps:</h4>
+            <ol style="margin: 0; padding-left: 20px; font-size: 14px; color: #475569;">
+                <li style="margin-bottom: 8px;">Manually issue the credential using the payload above.</li>
+                <li>Once issued, please notify the <strong>Onboarding Support Team</strong> so they can communicate with
+                    the customer.</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+        <div style="font-size: 12px; color: #94a3b8;">&copy; 2024 DOME Onboarding System</div>
+    </div>
+</div>
+{{end}}
