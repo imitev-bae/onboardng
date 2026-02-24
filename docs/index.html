@@ -1,20 +1,74 @@
-{{define "content"}}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Onboarding</title>
+    <link rel="stylesheet" href="assets/w3.css" />
+    <link rel="stylesheet" href="assets/dome.css" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Blinker:wght@100;200;300;400;600;700;800;900&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=check_circle,counter_1,counter_2,counter_3" />
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <script>
+        const weAreOnGHProd = window.location.hostname.includes('onboarding.dome-marketplace.eu');
+        const calledByDOMEProd = document.referrer.includes('dome-marketplace.eu');
+        var needsRedirect = weAreOnGHProd && !calledByDOMEProd;
+        if (needsRedirect) {
+            window.location.href = 'https://dome-marketplace.github.io/onboarding-pre/';
+        }
+    </script>
+</head>
+
+<body>
+    <header>
+        
+<div class="dome-header">
+    <div class="dome-content">
+        <div class="w3-bar">
+            <div class="w3-bar-item padding-right-0">
+                <a href="#">
+                    <img src="assets/logos/DOME_Icon_White.svg" alt="DOME Icon" style="width:100%;max-height:32px">
+                </a>
+            </div>
+            <div class="w3-bar-item">
+                <span class="blinker-semibold w3-xlarge nowrap">DOME Marketplace</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+    </header>
+
+    <main>
+        <div style="background-color: #EDF2FA; min-height: 100vh;">
+            <div class="w3-padding-32 dome-content">
+                
 <section class="onboarding-form" x-data="onboarding()" x-cloak>
 
     <h2 class="form-title" x-text="titles[step]"></h2>
 
-    <!-- Error/Success Messages -->
+    
     <div x-show="message" :class="messageType === 'error' ? 'w3-panel w3-red' : 'w3-panel w3-green'">
         <p x-text="message"></p>
     </div>
 
-    <!-- Step 1: Email Input -->
+    
     <div x-show="step === 'email'">
         <p>Please enter your email to receive a verification code.</p>
         <form @submit.prevent="sendCode">
             <div class="w3-row">
                 <div class="w3-third">
-                    {{template "input-component" dict "Label" "Email (*)" "Name" "email" "Model" "email" "Type" "email"}}
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Email (*)</label>
+    <input type="email" name="email" x-model="email" class="w3-input w3-border" required>
+</div>
+
                 </div>
             </div>
             <button type="submit" :disabled="loading"
@@ -25,7 +79,7 @@
         </form>
     </div>
 
-    <!-- Step 2: Verification Code -->
+    
     <div x-show="step === 'code'">
         <p>A code has been sent to <b x-text="email"></b>.</p>
         <div class="w3-panel w3-yellow">
@@ -36,7 +90,12 @@
         <form @submit.prevent="verifyCode">
             <div class="w3-row">
                 <div class="w3-third">
-                    {{template "input-component" dict "Label" "Verification Code (*)" "Name" "code" "Model" "code" "Type" "text"}}
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Verification Code (*)</label>
+    <input type="text" name="code" x-model="code" class="w3-input w3-border" required>
+</div>
+
                 </div>
             </div>
             <button type="submit" :disabled="loading"
@@ -47,13 +106,13 @@
         </form>
     </div>
 
-    <!-- Step 3: Registration Data -->
+    
     <div x-show="step === 'register'">
         <form @submit.prevent="register">
 
             <div class="w3-row-padding" style="padding-left:0px">
                 <div class="w3-third" style="padding-left:0px">
-                    <!-- Email is now read-only -->
+                    
                     <div class="form-group w3-margin-bottom">
                         <label class="form-label">Email</label>
                         <input type="email" class="w3-input w3-border" :value="email" disabled>
@@ -62,28 +121,116 @@
                 </div>
 
                 <div class="w3-third">
-                    {{template "input-component" dict "Label" "First Name (*)" "Name" "firstName" "Model" "formData.firstName" "Type" "text"}}
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">First Name (*)</label>
+    <input type="text" name="firstName" x-model="formData.firstName" class="w3-input w3-border" required>
+</div>
+
                 </div>
 
                 <div class="w3-third">
-                    {{template "input-component" dict "Label" "Last Name (*)" "Name" "lastName" "Model" "formData.lastName" "Type" "text"}}
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Last Name (*)</label>
+    <input type="text" name="lastName" x-model="formData.lastName" class="w3-input w3-border" required>
+</div>
+
                 </div>
 
             </div>
 
             <div class="w3-row-padding" style="padding-left:0px">
                 <div class="w3-third" style="padding-left:0px">
-                    {{template "input-component" dict "Label" "Company Name (*)" "Name" "companyName" "Model" "formData.companyName" "Type" "text"}}
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Company Name (*)</label>
+    <input type="text" name="companyName" x-model="formData.companyName" class="w3-input w3-border" required>
+</div>
+
                 </div>
                 <div class="w3-third">
-                    {{template "country-select" dict "Label" "Country of Incorporation (*)" "Name" "country" "Model" "formData.country" "Countries" .Countries}}
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Country of Incorporation (*)</label>
+    <select name="country" x-model="formData.country" class="w3-select w3-border" required>
+        <option value="" disabled selected>Select a country</option>
+        
+        <option value="US">United States</option>
+        
+        <option value="GB">United Kingdom</option>
+        
+        <option value="CA">Canada</option>
+        
+        <option value="AU">Australia</option>
+        
+        <option value="DE">Germany</option>
+        
+        <option value="FR">France</option>
+        
+        <option value="ES">Spain</option>
+        
+        <option value="IT">Italy</option>
+        
+        <option value="NL">Netherlands</option>
+        
+        <option value="BE">Belgium</option>
+        
+        <option value="CH">Switzerland</option>
+        
+        <option value="AT">Austria</option>
+        
+        <option value="SE">Sweden</option>
+        
+        <option value="NO">Norway</option>
+        
+        <option value="DK">Denmark</option>
+        
+        <option value="FI">Finland</option>
+        
+        <option value="IE">Ireland</option>
+        
+        <option value="PT">Portugal</option>
+        
+        <option value="GR">Greece</option>
+        
+        <option value="LU">Luxembourg</option>
+        
+        <option value="JP">Japan</option>
+        
+        <option value="CN">China</option>
+        
+        <option value="IN">India</option>
+        
+        <option value="BR">Brazil</option>
+        
+        <option value="MX">Mexico</option>
+        
+        <option value="ZA">South Africa</option>
+        
+        <option value="AE">United Arab Emirates</option>
+        
+        <option value="SG">Singapore</option>
+        
+        <option value="KR">South Korea</option>
+        
+        <option value="NZ">New Zealand</option>
+        
+    </select>
+</div>
+
                 </div>
                 <div class="w3-third">
-                    {{template "input-component" dict "Label" "VAT ID (*)" "Name" "vatId" "Model" "formData.vatId" "Type" "text"}}
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">VAT ID (*)</label>
+    <input type="text" name="vatId" x-model="formData.vatId" class="w3-input w3-border" required>
+</div>
+
                 </div>
             </div>
 
-            <!-- Honeypot -->
+            
             <input type="text" name="website" x-model="formData.website" style="display:none" tabindex="-1"
                 autocomplete="off">
 
@@ -122,7 +269,7 @@
                 companyName: '',
                 country: '',
                 vatId: '',
-                website: '' // Honeypot
+                website: '' 
             },
             loading: false,
             message: '',
@@ -142,7 +289,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest' // CSRF protection
+                            'X-Requested-With': 'XMLHttpRequest' 
                         },
                         body: JSON.stringify(body)
                     });
@@ -163,7 +310,7 @@
             async sendCode() {
                 const data = await this.callApi('/api/validate-email', { email: this.email });
                 if (data) {
-                    // Just for testing
+                    
                     this.codeValue = data.data.code;
                     this.step = 'code';
                 }
@@ -178,13 +325,13 @@
             },
 
             async register() {
-                // Include email in the registration data
+                
                 const body = { ...this.formData, email: this.email };
                 const data = await this.callApi('/api/register', body);
                 if (data) {
                     this.message = 'Registration successful! Your registration is being processed.';
                     this.messageType = 'success';
-                    // Reset or redirect could happen here
+                    
                 }
             },
 
@@ -205,23 +352,17 @@
         }
     }
 </script>
-{{end}}
 
-{{define "input-component"}}
-<div class="form-group w3-margin-bottom">
-    <label class="form-label">{{.Label}}</label>
-    <input type="{{.Type}}" name="{{.Name}}" x-model="{{.Model}}" class="w3-input w3-border" required>
-</div>
-{{end}}
+            </div>
+        </div>
+    </main>
 
-{{define "country-select"}}
-<div class="form-group w3-margin-bottom">
-    <label class="form-label">{{.Label}}</label>
-    <select name="{{.Name}}" x-model="{{.Model}}" class="w3-select w3-border" required>
-        <option value="" disabled selected>Select a country</option>
-        {{range .Countries}}
-        <option value="{{.Code}}">{{.Name}}</option>
-        {{end}}
-    </select>
-</div>
-{{end}}
+    <footer>
+        <div class="dome-content">
+            
+        </div>
+    </footer>
+
+</body>
+
+</html>

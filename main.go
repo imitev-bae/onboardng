@@ -17,9 +17,10 @@ import (
 )
 
 func main() {
+	generateFlag := flag.Bool("gen", false, "only generate frontend and exit, otherwise start server also")
 	watchFlag := flag.Bool("watch", false, "watch for changes and start server")
 	envFlag := flag.String("env", "dev", "environment to serve (dev, pre or pro)")
-	port := flag.String("port", "3000", "port for the server")
+	port := flag.String("port", "7777", "port for the server")
 	flag.Parse()
 
 	// Load configuration
@@ -38,6 +39,11 @@ func main() {
 	if err := generate(cfg); err != nil {
 		slog.Error("❌ Error generating frontend", "error", err)
 		os.Exit(1)
+	}
+
+	if *generateFlag {
+		slog.Info("Frontend generated. Exiting.")
+		os.Exit(0)
 	}
 
 	// Get the environment config
@@ -91,8 +97,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Static file serving from the generated directory
-	targetDir := filepath.Join(cfg.DestDir, *envFlag)
-	fileServer := http.FileServer(http.Dir(targetDir))
+	fileServer := http.FileServer(http.Dir(cfg.DestDir))
 	mux.Handle("/", fileServer)
 
 	// API Handlers (delegated to srv.Routes())
@@ -104,7 +109,7 @@ func main() {
 	}
 
 	// Start Server
-	slog.Info("🚀 Server running", "env", *envFlag, "dir", targetDir, "url", "http://localhost:"+*port)
+	slog.Info("🚀 Server running", "env", *envFlag, "dir", cfg.DestDir, "url", "https://onboarddev.dome.mycredential.eu")
 	if err := http.ListenAndServe(":"+*port, mux); err != nil {
 		slog.Error("Server failed", "error", err)
 		os.Exit(1)

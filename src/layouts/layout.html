@@ -3,9 +3,9 @@
 <html lang="en">
 
 <head>
-    <title>{{.AppName}} - {{.Env}}</title>
-    <link rel="stylesheet" href="w3.css" />
-    <link rel="stylesheet" href="dome.css" />
+    <title>{{.AppName}}</title>
+    <link rel="stylesheet" href="assets/w3.css" />
+    <link rel="stylesheet" href="assets/dome.css" />
     <link
         href="https://fonts.googleapis.com/css2?family=Blinker:wght@100;200;300;400;600;700;800;900&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&display=swap"
         rel="stylesheet">
@@ -14,7 +14,14 @@
 
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <script>const API_URL = {{.Vars.ApiUrl | safe}};</script>
+    <script>
+        const weAreOnGHProd = window.location.hostname.includes('onboarding.dome-marketplace.eu');
+        const calledByDOMEProd = document.referrer.includes('dome-marketplace.eu');
+        var needsRedirect = weAreOnGHProd && !calledByDOMEProd;
+        if (needsRedirect) {
+            window.location.href = 'https://dome-marketplace.github.io/onboarding-pre/';
+        }
+    </script>
 </head>
 
 <body>

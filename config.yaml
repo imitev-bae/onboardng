@@ -5,7 +5,6 @@ app_name: "Onboarding"
 environments:
 
   dev:
-    api_url: "http://localhost:3000"
     debug: true
     privateKeyFile: "config/development/sbx_didkey_priv.txt"
     machineCredentialFile: "config/development/sbx_lear_credential_machine.txt"
