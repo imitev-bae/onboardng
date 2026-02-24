@@ -34,7 +34,7 @@ type Service struct {
 }
 
 func NewService(runtime configuration.RuntimeEnv) (*Service, error) {
-	dbConn, err := sql.Open("sqlite", "onboarding.db")
+	dbConn, err := sql.Open("sqlite", "data/onboarding.db")
 	if err != nil {
 		return nil, err
 	}
