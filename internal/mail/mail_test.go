@@ -6,8 +6,6 @@ import (
 	"net"
 	"net/textproto"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -110,13 +108,6 @@ func (s *mockSMTPServer) handle(conn net.Conn) {
 }
 
 func TestSendWelcomeEmail(t *testing.T) {
-	// Change to project root to find templates
-	_, filename, _, _ := runtime.Caller(0)
-	dir := filepath.Join(filepath.Dir(filename), "../..")
-	err := os.Chdir(dir)
-	if err != nil {
-		t.Fatalf("failed to change directory to root: %v", err)
-	}
 
 	// Start mock SMTP server
 	mockServer, err := newMockSMTPServer("127.0.0.1:0")
@@ -151,7 +142,10 @@ func TestSendWelcomeEmail(t *testing.T) {
 	}
 
 	mailCfg := configuration.MailConfig{
-		SMTP: cfg,
+		OnboardTeamEmail: []string{"onboard@example.com"},
+		IssuerTeamEmail:  []string{"issuer@example.com"},
+		CCTeamEmail:      []string{"admin1@example.com", "admin2@example.com"},
+		SMTP:             cfg,
 	}
 
 	// Initialize Mail Service
@@ -168,12 +162,6 @@ func TestSendWelcomeEmail(t *testing.T) {
 		Email:          "recipient@example.com",
 	}
 
-	// Ensure template directory exists for test
-	templatePath := "src/email/email_welcome.html"
-	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
-		t.Skip("skipping test because template file does not exist")
-	}
-
 	// Send email
 	err = mailService.SendWelcomeEmail(reg)
 	if err != nil {
@@ -183,8 +171,11 @@ func TestSendWelcomeEmail(t *testing.T) {
 	// Verify received email
 	select {
 	case msg := <-mockServer.received:
-		if !strings.Contains(msg, "Welcome, John!") {
-			t.Errorf("expected email to contain 'Welcome, John!', got: %s", msg)
+		if !strings.Contains(msg, "Hello, John") {
+			t.Errorf("expected email to contain 'Hello, John', got: %s", msg)
+		}
+		if !strings.Contains(msg, "onboard@example.com") {
+			t.Errorf("expected email to contain 'onboard@example.com', got: %s", msg)
 		}
 		if !strings.Contains(msg, "Acme Corp") {
 			t.Errorf("expected email to contain 'Acme Corp', got: %s", msg)

@@ -3,6 +3,7 @@ package mail
 import (
 	"bytes"
 	"crypto/tls"
+	_ "embed"
 	"fmt"
 	"html/template"
 	"net/smtp"
@@ -12,6 +13,12 @@ import (
 	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
 )
+
+//go:embed templates/email_welcome.html
+var emailWelcomeTemplate string
+
+//go:embed templates/issuer_error.html
+var issuerErrorTemplate string
 
 type MailSender interface {
 	SendWelcomeEmail(reg *db.Registration) error
@@ -64,7 +71,7 @@ func (s *Service) SendWelcomeEmail(reg *db.Registration) error {
 		"OnboardTeamEmail": s.onboardTeamEmail[0],
 	}
 
-	tmpl, err := template.ParseFiles("src/email/email_welcome.html")
+	tmpl, err := template.New("email_welcome.html").Parse(emailWelcomeTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse email template: %w", err)
 	}
@@ -153,7 +160,7 @@ func (s *Service) SendIssuerError(reg *db.Registration, payload string, errorMsg
 		"Runtime":        s.runtime,
 	}
 
-	tmpl, err := template.ParseFiles("src/email/issuer_error.html")
+	tmpl, err := template.New("issuer_error.html").Parse(issuerErrorTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse email template: %w", err)
 	}
