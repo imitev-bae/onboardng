@@ -1,6 +1,7 @@
 package mainapp
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
 	"github.com/hesusruiz/onboardng/internal/mail"
+	"github.com/hesusruiz/onboardng/internal/maintenance"
 	"github.com/hesusruiz/onboardng/internal/server"
 	"gopkg.in/yaml.v3"
 )
@@ -48,6 +50,21 @@ func Run() error {
 	case "run":
 		// Start the server
 		runCmd.Parse(os.Args[2:])
+
+		// Environment variables take precedence over command-line flags
+		if envVal := os.Getenv("ONBOARDNG_CONFIG"); envVal != "" {
+			*runCfgPath = envVal
+		}
+		if envVal := os.Getenv("ONBOARDNG_WATCH"); envVal != "" {
+			*watchFlag = (envVal == "true" || envVal == "1")
+		}
+		if envVal := os.Getenv("ONBOARDNG_ENV"); envVal != "" {
+			*envFlag = envVal
+		}
+		if envVal := os.Getenv("ONBOARDNG_PORT"); envVal != "" {
+			*port = envVal
+		}
+
 		cfg := loadEncryptedConfig(*runCfgPath)
 		return run(cfg, *envFlag, *port, *watchFlag)
 
@@ -135,17 +152,15 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool) 
 		return err
 	}
 
-	srv := server.NewServer(dbService, issuanceService, mailService)
+	// Initialize and start automated Maintenance service
+	maintenanceService := maintenance.NewMaintenanceService()
+	// Schedule database maintenance everyday at 03:00
+	maintenanceService.AddTask("Database Maintenance", maintenance.Schedule{Hour: 3, Minute: 0}, dbService.RunMaintenance)
+	maintenanceService.Start()
 
-	// Setup mux for Static Files and API
-	mux := http.NewServeMux()
+	dbService.RunMaintenance(context.Background())
 
-	// Static file serving from the generated directory
-	fileServer := http.FileServer(http.Dir(cfg.DestDir))
-	mux.Handle("/", fileServer)
-
-	// API Handlers (delegated to srv.Routes())
-	mux.Handle("/api/", srv.RegisterRoutes())
+	srv := server.NewServer(dbService, issuanceService, mailService, cfg.DestDir)
 
 	// Start Watcher if requested
 	if watchFlag {
@@ -154,7 +169,7 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool) 
 
 	// Start Server
 	slog.Info("🚀 Server running", "env", envFlag, "dir", cfg.DestDir, "url", "https://onboarddev.dome.mycredential.eu")
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, srv.Handler); err != nil {
 		slog.Error("Server failed", "error", err)
 		return err
 	}
@@ -164,13 +179,29 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool) 
 
 func loadEncryptedConfig(path string) configuration.Config {
 	// 1. Determine if we need to decrypt
-	var reader io.Reader
-	file, err := os.Open(path)
-	if err != nil {
-		log.Fatalf("Error: Could not open config file: %v", err)
-	}
-	defer file.Close()
+	var source io.ReadCloser
 
+	if strings.HasPrefix(path, "https://") {
+		fmt.Printf("Fetching remote config from %s\n", path)
+		resp, err := http.Get(path)
+		if err != nil {
+			log.Fatalf("Error: Could not fetch remote config: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			log.Fatalf("Error: Remote config returned status %d", resp.StatusCode)
+		}
+		source = resp.Body
+	} else {
+		file, err := os.Open(path)
+		if err != nil {
+			log.Fatalf("Error: Could not open config file: %v", err)
+		}
+		source = file
+	}
+	defer source.Close()
+
+	var reader io.Reader
 	if strings.HasSuffix(path, ".age") {
 		// Decryption mode
 		key := os.Getenv("AGE_SECRET_KEY")
@@ -183,14 +214,14 @@ func loadEncryptedConfig(path string) configuration.Config {
 			log.Fatalf("Error: Invalid identity key: %v", err)
 		}
 
-		ageReader, err := age.Decrypt(file, identity)
+		ageReader, err := age.Decrypt(source, identity)
 		if err != nil {
 			log.Fatalf("Error: Failed to decrypt file: %v", err)
 		}
 		reader = ageReader
 	} else {
 		// Standard YAML mode (Development)
-		reader = file
+		reader = source
 		fmt.Println("Running in Development Mode (Unencrypted YAML)")
 	}
 

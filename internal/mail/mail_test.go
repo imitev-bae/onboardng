@@ -155,7 +155,7 @@ func TestSendWelcomeEmail(t *testing.T) {
 	}
 
 	// Mock registration data
-	reg := &db.Registration{
+	reg := &db.RegistrationRecord{
 		FirstName:      "John",
 		CompanyName:    "Acme Corp",
 		RegistrationID: "20260222-12345678",

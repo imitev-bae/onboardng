@@ -23,6 +23,8 @@ require (
 require (
 	filippo.io/age v1.3.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/hesusruiz/utils/errl v0.0.0-20260203155429-e59ff4b6d2e4
 	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/time v0.14.0
 	gopkg.in/yaml.v3 v3.0.1
 )

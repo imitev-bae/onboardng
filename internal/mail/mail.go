@@ -21,7 +21,7 @@ var emailWelcomeTemplate string
 var issuerErrorTemplate string
 
 type MailSender interface {
-	SendWelcomeEmail(reg *db.Registration) error
+	SendWelcomeEmail(reg *db.RegistrationRecord) error
 }
 
 type Service struct {
@@ -54,7 +54,7 @@ func NewMailService(runtime configuration.RuntimeEnv, cfg configuration.MailConf
 	}, nil
 }
 
-func (s *Service) SendWelcomeEmail(reg *db.Registration) error {
+func (s *Service) SendWelcomeEmail(reg *db.RegistrationRecord) error {
 	if !s.smtpConfig.Enabled {
 		return nil
 	}
@@ -146,7 +146,7 @@ func (s *Service) SendWelcomeEmail(reg *db.Registration) error {
 	return smtp.SendMail(addr, auth, from, to, msg)
 }
 
-func (s *Service) SendIssuerError(reg *db.Registration, payload string, errorMsg string) error {
+func (s *Service) SendIssuerError(reg *db.RegistrationRecord, payload string, errorMsg string) error {
 	if !s.smtpConfig.Enabled {
 		return nil
 	}

@@ -23,11 +23,6 @@ type APIResponse struct {
 	Data    any    `json:"data,omitempty"`
 }
 
-type RateLimitEntry struct {
-	Count     int
-	StartTime time.Time
-}
-
 type RegistrationRequest struct {
 	FirstName   string `json:"firstName"`
 	LastName    string `json:"lastName"`
@@ -113,29 +108,14 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Rate limiting
-	s.RateLimiterMu.Lock()
-	entry, exists := s.EmailRateLimiter[req.Email]
-
-	if !exists || time.Since(entry.StartTime) > 3*time.Minute {
-		s.EmailRateLimiter[req.Email] = &RateLimitEntry{
-			Count:     1,
-			StartTime: time.Now(),
-		}
-	} else {
-		if entry.Count >= 3 {
-			s.RateLimiterMu.Unlock()
-			s.SendJSON(w, http.StatusTooManyRequests, false, "Too many requests. Please wait a few minutes.", nil)
-			return
-		}
-		entry.Count++
+	if !s.RegisterEmailAttempt(req.Email) {
+		s.SendJSON(w, http.StatusTooManyRequests, false, "Too many requests. Please wait a few minutes.", nil)
+		return
 	}
-	s.RateLimiterMu.Unlock()
 
 	// Generate and store code
 	code := generateCode()
-	s.CodesMu.Lock()
-	s.VerificationCodes[req.Email] = code
-	s.CodesMu.Unlock()
+	s.StoreVerificationCode(req.Email, code)
 
 	s.SendJSON(w, http.StatusOK, true, "Validation code sent to your email", map[string]string{"code": code})
 }
@@ -160,20 +140,21 @@ func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.CodesMu.RLock()
-	expectedCode, exists := s.VerificationCodes[req.Email]
-	s.CodesMu.RUnlock()
-
-	if !exists || expectedCode != req.Code {
+	if !s.VerifyCode(req.Email, req.Code) {
 		s.SendJSON(w, http.StatusBadRequest, false, "Invalid verification code", nil)
 		return
 	}
 
-	s.CodesMu.Lock()
-	delete(s.VerificationCodes, req.Email)
-	s.CodesMu.Unlock()
-
 	s.SendJSON(w, http.StatusOK, true, "Email verified successfully", nil)
+}
+
+// HandleHealth returns a simple 200 OK response for health checks
+func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.SendJSON(w, http.StatusOK, true, "OK", nil)
 }
 
 func (s *RegistrationRequest) Validate() error {
@@ -266,7 +247,7 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	regID := generateRegistrationID()
-	reg := &db.Registration{
+	reg := &db.RegistrationRecord{
 		RegistrationID: regID,
 		Email:          requestData.Email,
 		FirstName:      requestData.FirstName,

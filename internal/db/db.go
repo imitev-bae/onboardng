@@ -10,8 +10,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Registration represents a user registration record in the database
-type Registration struct {
+// RegistrationRecord represents a user registration record in the database
+type RegistrationRecord struct {
 	RegistrationID  string    `json:"registration_id"`
 	Email           string    `json:"email"`
 	FirstName       string    `json:"first_name"`
@@ -27,14 +27,18 @@ type Registration struct {
 	NotifEmailError string    `json:"notif_email_error,omitempty"`
 }
 
+const dbPath = "data/onboarding.db"
+
 // Service provides database operations for registrations
 type Service struct {
+	dbPath  string
 	conn    *sql.DB
 	runtime configuration.RuntimeEnv
 }
 
 func NewService(runtime configuration.RuntimeEnv) (*Service, error) {
-	dbConn, err := sql.Open("sqlite", "data/onboarding.db")
+
+	dbConn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -61,14 +65,14 @@ func NewService(runtime configuration.RuntimeEnv) (*Service, error) {
 		return nil, err
 	}
 
-	return &Service{conn: dbConn, runtime: runtime}, nil
+	return &Service{dbPath: dbPath, conn: dbConn, runtime: runtime}, nil
 }
 
 func (s *Service) Close() error {
 	return s.conn.Close()
 }
 
-func (s *Service) SaveRegistration(reg *Registration) error {
+func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 	insertQuery := `
 	INSERT INTO registrations (
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
@@ -119,7 +123,7 @@ func (s *Service) SaveRegistration(reg *Registration) error {
 	return fmt.Errorf("unknown runtime environment: %s", s.runtime)
 }
 
-func (s *Service) UpdateRegistrationStatus(reg *Registration) error {
+func (s *Service) UpdateRegistrationStatus(reg *RegistrationRecord) error {
 	reg.UpdatedAt = time.Now()
 	query := `
 	UPDATE registrations SET
@@ -136,7 +140,7 @@ func (s *Service) UpdateRegistrationStatus(reg *Registration) error {
 	return err
 }
 
-func (s *Service) AmendRegistration(reg *Registration) error {
+func (s *Service) AmendRegistration(reg *RegistrationRecord) error {
 	reg.UpdatedAt = time.Now()
 	query := `
 	UPDATE registrations SET
@@ -161,7 +165,7 @@ func (s *Service) AmendRegistration(reg *Registration) error {
 	return err
 }
 
-func (s *Service) GetRegistrations(limit, offset int) ([]Registration, error) {
+func (s *Service) GetRegistrations(limit, offset int) ([]RegistrationRecord, error) {
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
@@ -176,9 +180,9 @@ func (s *Service) GetRegistrations(limit, offset int) ([]Registration, error) {
 	}
 	defer rows.Close()
 
-	var regs []Registration
+	var regs []RegistrationRecord
 	for rows.Next() {
-		var reg Registration
+		var reg RegistrationRecord
 		err := rows.Scan(
 			&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
 			&reg.CreatedAt, &reg.UpdatedAt, &reg.IssuanceAt, &reg.IssuanceError, &reg.NotifEmailAt, &reg.NotifEmailError,
@@ -196,7 +200,7 @@ func (s *Service) GetRegistrations(limit, offset int) ([]Registration, error) {
 	return regs, nil
 }
 
-func (s *Service) GetRegistration(vatID string, email string) (*Registration, error) {
+func (s *Service) GetRegistration(vatID string, email string) (*RegistrationRecord, error) {
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
@@ -204,7 +208,7 @@ func (s *Service) GetRegistration(vatID string, email string) (*Registration, er
 	FROM registrations
 	WHERE vat_id = ? AND email = ?`
 
-	var reg Registration
+	var reg RegistrationRecord
 	err := s.conn.QueryRow(query, vatID, email).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.IssuanceAt, &reg.IssuanceError, &reg.NotifEmailAt, &reg.NotifEmailError,
