@@ -35,7 +35,7 @@ FROM alpine/curl:latest
 
 WORKDIR /
 COPY --from=onboardngbuilder /onboardng /onboardng
-COPY www /www
+COPY src /src
 COPY --from=sqlite3_rsync --chmod=755 /usr/local/bin/sqlite3_rsync /usr/local/bin/sqlite3_rsync
 
 HEALTHCHECK \
