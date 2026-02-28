@@ -40,16 +40,31 @@ func Run() error {
 	sealIn := sealCmd.String("in", "config/config.yaml", "Plaintext YAML file to encrypt")
 	sealOut := sealCmd.String("out", "config.age", "Target encrypted file path")
 
-	if len(os.Args) < 2 {
-		usage(runCmd, generateCmd, sealCmd)
-		return nil
+	command := os.Getenv("ONBOARDNG_COMMAND")
+	var cmdArgs []string
+
+	if command != "" {
+		// If command is from ENV, all CLI args are potential flags for that command
+		if len(os.Args) > 1 {
+			cmdArgs = os.Args[1:]
+		}
+	} else {
+		// If no ENV command, use CLI arg as command
+		if len(os.Args) < 2 {
+			usage(runCmd, generateCmd, sealCmd)
+			return nil
+		}
+		command = os.Args[1]
+		if len(os.Args) > 2 {
+			cmdArgs = os.Args[2:]
+		}
 	}
 
 	// Route the Command
-	switch os.Args[1] {
+	switch command {
 	case "run":
 		// Start the server
-		runCmd.Parse(os.Args[2:])
+		runCmd.Parse(cmdArgs)
 
 		// Environment variables take precedence over command-line flags
 		if envVal := os.Getenv("ONBOARDNG_CONFIG"); envVal != "" {
@@ -70,13 +85,13 @@ func Run() error {
 
 	case "generate":
 		// Generate the frontend
-		generateCmd.Parse(os.Args[2:])
+		generateCmd.Parse(cmdArgs)
 		cfg := loadEncryptedConfig(*runCfgPath)
 		return generate(cfg)
 
 	case "seal":
 		// Seal the config file
-		sealCmd.Parse(os.Args[2:])
+		sealCmd.Parse(cmdArgs)
 		executeSeal(*sealIn, *sealOut)
 
 	default:
