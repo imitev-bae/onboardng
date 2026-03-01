@@ -60,6 +60,7 @@ type IssuerConfig struct {
 }
 
 type MailConfig struct {
+	AgeSecretKey     string   `yaml:"-"`
 	OnboardTeamEmail []string `yaml:"onboard_team_email"`
 	IssuerTeamEmail  []string `yaml:"issuer_team_email"`
 	CCTeamEmail      []string `yaml:"cc_list_email"`
@@ -73,4 +74,5 @@ type SMTPConfig struct {
 	TLS          bool   `json:"tls,omitempty" yaml:"tls"`
 	Username     string `json:"username,omitempty" yaml:"username"`
 	PasswordFile string `json:"passwordFile,omitempty" yaml:"passwordFile"`
+	Password     string `json:"password,omitempty" yaml:"password"`
 }

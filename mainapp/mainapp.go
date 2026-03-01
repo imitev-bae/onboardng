@@ -149,6 +149,7 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 
 	// Pass the secret key to the environment configuration
 	srvConfig.AgeSecretKey = secretKey
+	srvConfig.Mail.AgeSecretKey = secretKey
 	cfg.Environments[envFlag] = srvConfig
 
 	runtimeEnv := configuration.RuntimeEnv(envFlag)
@@ -300,6 +301,7 @@ func sealConfig(inputPath, outputPath string) error {
 	publicKey := identity.Recipient()
 
 	// Encrypt private key and machine credential for each environment
+	// Encrypt also the SMTP password
 	for name, env := range cfg.Environments {
 		privateKeyEncrypted, err := sealFile(env.PrivateKeyFile, publicKey)
 		if err != nil {
@@ -309,9 +311,13 @@ func sealConfig(inputPath, outputPath string) error {
 		if err != nil {
 			return err
 		}
-
+		smtpPasswordEncrypted, err := sealFile(env.Mail.SMTP.PasswordFile, publicKey)
+		if err != nil {
+			return err
+		}
 		env.PrivateKey = string(privateKeyEncrypted)
 		env.MachineCredential = string(machineCredentialEncrypted)
+		env.Mail.SMTP.Password = string(smtpPasswordEncrypted)
 		cfg.Environments[name] = env
 	}
 

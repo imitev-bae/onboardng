@@ -6,12 +6,16 @@ import (
 	_ "embed"
 	"fmt"
 	"html/template"
+	"io"
+	"log/slog"
 	"net/smtp"
 	"os"
 	"strings"
 
+	"filippo.io/age"
 	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
+	"github.com/hesusruiz/utils/errl"
 )
 
 //go:embed templates/email_welcome.html
@@ -38,11 +42,37 @@ func NewMailService(runtime configuration.RuntimeEnv, cfg configuration.MailConf
 		return &Service{runtime: runtime, smtpConfig: cfg.SMTP}, nil
 	}
 
-	passwordBytes, err := os.ReadFile(cfg.SMTP.PasswordFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read SMTP password file: %w", err)
+	var password string
+	if cfg.SMTP.Password != "" {
+		// Decrypt the password from configuration
+		if cfg.AgeSecretKey == "" {
+			return nil, fmt.Errorf("AgeSecretKey is missing but required for encrypted SMTP password")
+		}
+
+		identity, err := age.ParseHybridIdentity(cfg.AgeSecretKey)
+		if err != nil {
+			return nil, errl.Errorf("invalid identity key: %w", err)
+		}
+
+		ageReader, err := age.Decrypt(strings.NewReader(cfg.SMTP.Password), identity)
+		if err != nil {
+			return nil, errl.Errorf("failed to decrypt SMTP password: %w", err)
+		}
+
+		passBytes, err := io.ReadAll(ageReader)
+		if err != nil {
+			return nil, errl.Errorf("failed to read decrypted SMTP password: %w", err)
+		}
+		password = strings.TrimSpace(string(passBytes))
+	} else {
+		slog.Warn("SMTP password not found in configuration, reading from file")
+		// Read the password from a file
+		passwordBytes, err := os.ReadFile(cfg.SMTP.PasswordFile)
+		if err != nil {
+			return nil, errl.Errorf("failed to read SMTP password file: %w", err)
+		}
+		password = strings.TrimSpace(string(passwordBytes))
 	}
-	password := strings.TrimSpace(string(passwordBytes))
 
 	return &Service{
 		runtime:          runtime,
