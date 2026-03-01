@@ -24,6 +24,9 @@ var emailWelcomeTemplate string
 //go:embed templates/issuer_error.html
 var issuerErrorTemplate string
 
+//go:embed templates/email_verification.html
+var emailVerificationTemplate string
+
 type MailSender interface {
 	SendWelcomeEmail(reg *db.RegistrationRecord) error
 }
@@ -120,60 +123,40 @@ func (s *Service) SendWelcomeEmail(reg *db.RegistrationRecord) error {
 		"Subject: " + subject + "\n" +
 		mime + body.String())
 
-	addr := fmt.Sprintf("%s:%d", s.smtpConfig.Host, s.smtpConfig.Port)
-	auth := smtp.PlainAuth("", s.smtpConfig.Username, s.password, s.smtpConfig.Host)
+	return s.send(from, to, msg)
+}
 
-	if s.smtpConfig.TLS && s.smtpConfig.Port == 465 {
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: false,
-			ServerName:         s.smtpConfig.Host,
-		}
-
-		conn, err := tls.Dial("tcp", addr, tlsConfig)
-		if err != nil {
-			return fmt.Errorf("failed to dial TLS: %w", err)
-		}
-		defer conn.Close()
-
-		c, err := smtp.NewClient(conn, s.smtpConfig.Host)
-		if err != nil {
-			return fmt.Errorf("failed to create SMTP client: %w", err)
-		}
-		defer c.Quit()
-
-		if err = c.Auth(auth); err != nil {
-			return fmt.Errorf("failed to authenticate: %w", err)
-		}
-
-		if err = c.Mail(from); err != nil {
-			return fmt.Errorf("failed to set sender: %w", err)
-		}
-
-		for _, addr := range to {
-			if err = c.Rcpt(addr); err != nil {
-				return fmt.Errorf("failed to add recipient: %w", err)
-			}
-		}
-
-		w, err := c.Data()
-		if err != nil {
-			return fmt.Errorf("failed to open data writer: %w", err)
-		}
-
-		_, err = w.Write(msg)
-		if err != nil {
-			return fmt.Errorf("failed to write message: %w", err)
-		}
-
-		err = w.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close data writer: %w", err)
-		}
-
+func (s *Service) SendVerificationCode(email string, code string) error {
+	if !s.smtpConfig.Enabled {
 		return nil
 	}
 
-	return smtp.SendMail(addr, auth, from, to, msg)
+	data := map[string]any{
+		"Code":             code,
+		"Runtime":          s.runtime,
+		"OnboardTeamEmail": s.onboardTeamEmail[0],
+	}
+
+	tmpl, err := template.New("email_verification.html").Parse(emailVerificationTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse email template: %w", err)
+	}
+
+	var body bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&body, "content", data); err != nil {
+		return fmt.Errorf("failed to execute email template: %w", err)
+	}
+
+	from := s.smtpConfig.Username
+	to := []string{email}
+	subject := "DOME Marketplace Verification Code"
+	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+	msg := []byte("From: " + from + "\n" +
+		"To: " + strings.Join(to, ", ") + "\n" +
+		"Subject: " + subject + "\n" +
+		mime + body.String())
+
+	return s.send(from, to, msg)
 }
 
 func (s *Service) SendIssuerError(reg *db.RegistrationRecord, payload string, errorMsg string) error {
@@ -209,6 +192,10 @@ func (s *Service) SendIssuerError(reg *db.RegistrationRecord, payload string, er
 		"Subject: " + subject + "\n" +
 		mime + body.String())
 
+	return s.send(from, to, msg)
+}
+
+func (s *Service) send(from string, to []string, msg []byte) error {
 	addr := fmt.Sprintf("%s:%d", s.smtpConfig.Host, s.smtpConfig.Port)
 	auth := smtp.PlainAuth("", s.smtpConfig.Username, s.password, s.smtpConfig.Host)
 

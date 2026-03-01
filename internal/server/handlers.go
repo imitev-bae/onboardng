@@ -117,6 +117,13 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 	code := generateCode()
 	s.StoreVerificationCode(req.Email, code)
 
+	// Send the code to the user
+	go func() {
+		if err := s.Mail.SendVerificationCode(req.Email, code); err != nil {
+			slog.Error("❌ Error sending verification code", "error", err)
+		}
+	}()
+
 	s.SendJSON(w, http.StatusOK, true, "Validation code sent to your email", map[string]string{"code": code})
 }
 
