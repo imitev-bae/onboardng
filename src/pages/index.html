@@ -108,6 +108,74 @@
         </form>
     </div>
 
+
+    <!-- Step 4: Welcome to the user -->
+    <div x-show="step === 'welcome'">
+        <form @submit.prevent="welcome">
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    <!-- Email is now read-only -->
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="w3-input w3-border" :value="email" disabled>
+                    </div>
+
+                </div>
+
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">First Name (*)</label>
+                        <input type="text" name="firstName" :value="formData.firstName" class="w3-input w3-border"
+                            disabled>
+                    </div>
+                </div>
+
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Last Name (*)</label>
+                        <input type="text" name="lastName" :value="formData.lastName" class="w3-input w3-border"
+                            disabled>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Company Name (*)</label>
+                        <input type="text" name="companyName" :value="formData.companyName" class="w3-input w3-border"
+                            disabled>
+                    </div>
+                </div>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Country of Incorporation (*)</label>
+                        <input type="text" name="country" :value="formData.country" class="w3-input w3-border" disabled>
+                    </div>
+                </div>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">VAT ID (*)</label>
+                        <input type="text" name="vatId" :value="formData.vatId" class="w3-input w3-border" disabled>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Honeypot -->
+            <input type="text" name="website" x-model="formData.website" style="display:none" tabindex="-1"
+                autocomplete="off">
+
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Registering...</span>
+                <span x-show="!loading">Go to DOME Marketplace</span>
+            </button>
+        </form>
+    </div>
+
+
 </section>
 
 <script>
@@ -131,7 +199,8 @@
             titles: {
                 'email': 'Register in DOME Marketplace',
                 'code': 'Verify Your Email',
-                'register': 'Please fill this form to register'
+                'register': 'Please fill this form to register',
+                'welcome': 'Welcome to DOME Marketplace'
             },
 
             async callApi(endpoint, body) {
@@ -184,8 +253,17 @@
                 if (data) {
                     this.message = 'Registration successful! Your registration is being processed.';
                     this.messageType = 'success';
+                    this.step = 'welcome';
                     // Reset or redirect could happen here
                 }
+            },
+
+            async welcome() {
+                if (widow.location.hostname.includes('onboard.sbx.evidenceledger.eu')) {
+                    window.location.href = 'https://dome-marketplace-sbx.org';
+                    return;
+                }
+                return;
             },
 
             frontURLs: {
