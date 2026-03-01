@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/hesusruiz/onboardng/internal/configuration"
+	"github.com/hesusruiz/utils/errl"
 	_ "modernc.org/sqlite"
 )
 
@@ -27,7 +29,8 @@ type RegistrationRecord struct {
 	NotifEmailError string    `json:"notif_email_error,omitempty"`
 }
 
-const dbPath = "data/onboarding.db"
+const dbDir = "data"
+const dbPath = dbDir + "/onboarding.db"
 
 // Service provides database operations for registrations
 type Service struct {
@@ -38,9 +41,15 @@ type Service struct {
 
 func NewService(runtime configuration.RuntimeEnv) (*Service, error) {
 
+	// Create the directory if it does not exist
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return nil, errl.Errorf("failed to create data directory: %v", err)
+	}
+
+	// Open the database
 	dbConn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		return nil, err
+		return nil, errl.Errorf("failed to open database: %v", err)
 	}
 
 	// Create table if not exists
@@ -62,7 +71,7 @@ func NewService(runtime configuration.RuntimeEnv) (*Service, error) {
 	);`
 	if _, err := dbConn.Exec(query); err != nil {
 		dbConn.Close()
-		return nil, err
+		return nil, errl.Errorf("failed to create table: %v", err)
 	}
 
 	return &Service{dbPath: dbPath, conn: dbConn, runtime: runtime}, nil

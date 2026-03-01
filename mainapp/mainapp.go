@@ -21,6 +21,7 @@ import (
 	"github.com/hesusruiz/onboardng/internal/mail"
 	"github.com/hesusruiz/onboardng/internal/maintenance"
 	"github.com/hesusruiz/onboardng/internal/server"
+	"github.com/hesusruiz/utils/errl"
 	"gopkg.in/yaml.v3"
 )
 
@@ -143,7 +144,7 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 	srvConfig, ok := cfg.Environments[envFlag]
 	if !ok {
 		slog.Error("❌ Environment not found in config", "env", envFlag)
-		return fmt.Errorf("environment %s not found", envFlag)
+		return errl.Errorf("environment %s not found", envFlag)
 	}
 
 	// Pass the secret key to the environment configuration
@@ -172,14 +173,14 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 	}
 	issuanceService, err := credissuance.NewLEARIssuance(issuerCfg)
 	if err != nil {
-		slog.Error("❌ Error creating issuance service", "error", err)
+		slog.Error("❌ Error creating issuance service", "error", errl.Error(err))
 		os.Exit(1)
 	}
 
 	// Initialize Database service
 	dbService, err := db.NewService(runtimeEnv)
 	if err != nil {
-		slog.Error("❌ Error initializing database service", "error", err)
+		slog.Error("❌ Error initializing database service", "error", errl.Error(err))
 		return err
 	}
 	defer dbService.Close()
@@ -187,7 +188,7 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 	// Initialize Mail service
 	mailService, err := mail.NewMailService(runtimeEnv, srvConfig.Mail)
 	if err != nil {
-		slog.Error("❌ Error initializing mail service", "error", err)
+		slog.Error("❌ Error initializing mail service", "error", errl.Error(err))
 		return err
 	}
 
@@ -209,8 +210,9 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 	// Start Server
 	slog.Info("🚀 Server running", "env", envFlag, "dir", cfg.DestDir, "url", "https://onboarddev.dome.mycredential.eu")
 	if err := http.ListenAndServe(":"+port, srv.Handler); err != nil {
-		slog.Error("Server failed", "error", err)
-		return err
+		newerr := errl.Error(err)
+		slog.Error("Server failed", "error", newerr)
+		return newerr
 	}
 
 	return nil
