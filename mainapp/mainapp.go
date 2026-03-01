@@ -1,6 +1,7 @@
 package mainapp
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -80,19 +81,35 @@ func Run() error {
 			*port = envVal
 		}
 
-		cfg := loadEncryptedConfig(*runCfgPath)
-		return run(cfg, *envFlag, *port, *watchFlag)
+		// Read and immediately UNSET the secret key from the environment
+		secretKey := os.Getenv("AGE_SECRET_KEY")
+		if secretKey != "" {
+			os.Unsetenv("AGE_SECRET_KEY")
+			slog.Info("🔐 AGE_SECRET_KEY captured and removed from environment")
+		}
+
+		cfg := loadEncryptedConfig(*runCfgPath, secretKey)
+		return run(cfg, *envFlag, *port, *watchFlag, secretKey)
 
 	case "generate":
 		// Generate the frontend
 		generateCmd.Parse(cmdArgs)
-		cfg := loadEncryptedConfig(*runCfgPath)
+
+		// Read and immediately UNSET the secret key from the environment
+		secretKey := os.Getenv("AGE_SECRET_KEY")
+		if secretKey != "" {
+			os.Unsetenv("AGE_SECRET_KEY")
+		}
+
+		cfg := loadEncryptedConfig(*runCfgPath, secretKey)
 		return generate(cfg)
 
 	case "seal":
 		// Seal the config file
 		sealCmd.Parse(cmdArgs)
-		executeSeal(*sealIn, *sealOut)
+		if err := sealConfig(*sealIn, *sealOut); err != nil {
+			log.Fatalf("Error sealing config: %v", err)
+		}
 
 	default:
 		// Show usage
@@ -121,7 +138,7 @@ func usage(runCmd, generateCmd, sealCmd *flag.FlagSet) {
 	fmt.Println()
 }
 
-func run(cfg configuration.Config, envFlag string, port string, watchFlag bool) error {
+func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, secretKey string) error {
 	// Get the environment config
 	srvConfig, ok := cfg.Environments[envFlag]
 	if !ok {
@@ -129,14 +146,21 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool) 
 		return fmt.Errorf("environment %s not found", envFlag)
 	}
 
+	// Pass the secret key to the environment configuration
+	srvConfig.AgeSecretKey = secretKey
+	cfg.Environments[envFlag] = srvConfig
+
 	runtimeEnv := configuration.RuntimeEnv(envFlag)
 
 	// Setup issuer
 	issuerCfg := configuration.EnvConfig{
 		Runtime:               runtimeEnv,
+		AgeSecretKey:          srvConfig.AgeSecretKey,
 		Debug:                 srvConfig.Debug,
 		PrivateKeyFile:        srvConfig.PrivateKeyFile,
+		PrivateKey:            srvConfig.PrivateKey,
 		MachineCredentialFile: srvConfig.MachineCredentialFile,
+		MachineCredential:     srvConfig.MachineCredential,
 		MyDidkey:              srvConfig.MyDidkey,
 		Verifier: configuration.VerifierConfig{
 			URL:           srvConfig.Verifier.URL,
@@ -192,10 +216,10 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool) 
 	return nil
 }
 
-func loadEncryptedConfig(path string) configuration.Config {
-	// 1. Determine if we need to decrypt
+func loadEncryptedConfig(path string, secretKey string) configuration.Config {
 	var source io.ReadCloser
 
+	// Handle both remote and local files
 	if strings.HasPrefix(path, "https://") {
 		fmt.Printf("Fetching remote config from %s\n", path)
 		resp, err := http.Get(path)
@@ -219,12 +243,11 @@ func loadEncryptedConfig(path string) configuration.Config {
 	var reader io.Reader
 	if strings.HasSuffix(path, ".age") {
 		// Decryption mode
-		key := os.Getenv("AGE_SECRET_KEY")
-		if key == "" {
+		if secretKey == "" {
 			log.Fatal("Error: AGE_SECRET_KEY environment variable is missing but required for .age files")
 		}
 
-		identity, err := age.ParseHybridIdentity(key)
+		identity, err := age.ParseHybridIdentity(secretKey)
 		if err != nil {
 			log.Fatalf("Error: Invalid identity key: %v", err)
 		}
@@ -237,7 +260,7 @@ func loadEncryptedConfig(path string) configuration.Config {
 	} else {
 		// Standard YAML mode (Development)
 		reader = source
-		fmt.Println("Running in Development Mode (Unencrypted YAML)")
+		slog.Warn("Running in Development Mode (Unencrypted YAML)")
 	}
 
 	// 2. Parse YAML
@@ -251,8 +274,108 @@ func loadEncryptedConfig(path string) configuration.Config {
 	return cfg
 }
 
-// --- Security Logic (SEAL) ---
+// sealConfig encrypts a plain config file using age encryption
+// It also encrypts the private key and machine credential, reading from the file paths specified in the config.
+// The encrypted private key and machine credential are stored in the corresponding fields in the config.
+func sealConfig(inputPath, outputPath string) error {
+	// Load plain unencrypted config file
+	plainBytes, err := os.ReadFile(inputPath)
+	if err != nil {
+		return err
+	}
 
+	// Parse YAML
+	var cfg configuration.Config
+	if err := yaml.NewDecoder(bytes.NewReader(plainBytes)).Decode(&cfg); err != nil {
+		return err
+	}
+
+	// Generate new identity (Private + Public)
+	identity, err := age.GenerateHybridIdentity()
+	if err != nil {
+		log.Fatalf("Error: Key generation failed: %v", err)
+	}
+	publicKey := identity.Recipient()
+
+	// Encrypt private key and machine credential for each environment
+	for name, env := range cfg.Environments {
+		privateKeyEncrypted, err := sealFile(env.PrivateKeyFile, publicKey)
+		if err != nil {
+			return err
+		}
+		machineCredentialEncrypted, err := sealFile(env.MachineCredentialFile, publicKey)
+		if err != nil {
+			return err
+		}
+
+		env.PrivateKey = string(privateKeyEncrypted)
+		env.MachineCredential = string(machineCredentialEncrypted)
+		cfg.Environments[name] = env
+	}
+
+	// Marshall to YAML
+	yamlBytes, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	ageWriter, err := age.Encrypt(&buf, publicKey)
+	if err != nil {
+		return err
+	}
+	if _, err := ageWriter.Write(yamlBytes); err != nil {
+		return err
+	}
+	ageWriter.Close()
+
+	// Write config file
+	if err := os.WriteFile(outputPath, buf.Bytes(), 0600); err != nil {
+		return err
+	}
+
+	// Present the credentials to the user
+	fmt.Println("=======================================================================")
+	fmt.Println("✅ CONFIGURATION SEALED WITH POST-QUANTUM ENCRYPTION (MLKEM768-X25519)")
+	fmt.Println("=======================================================================")
+	fmt.Printf("Encrypted File: %s\n", outputPath)
+	fmt.Printf("Private Key:    %s\n", identity.String())
+	fmt.Println("=======================================================================")
+	fmt.Println("ACTION REQUIRED:")
+	fmt.Println("1. Commit the .age file to your repository.")
+	fmt.Println("2. Set the Private Key as AGE_SECRET_KEY in your environment.")
+	fmt.Println("3. DO NOT LOSE THIS KEY. It cannot be recovered.")
+	fmt.Println("=======================================================================")
+
+	return nil
+}
+
+// sealFile encrypts a file using age encryption
+// It returns the encrypted file as a byte array
+func sealFile(inputPath string, publicKey age.Recipient) ([]byte, error) {
+	inputFile, err := os.Open(inputPath)
+	if err != nil {
+		return nil, err
+	}
+	defer inputFile.Close()
+
+	var buf bytes.Buffer
+	ageWriter, err := age.Encrypt(&buf, publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := io.Copy(ageWriter, inputFile); err != nil {
+		return nil, err
+	}
+	if err := ageWriter.Close(); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// executeSeal encrypts a file using age encryption
 func executeSeal(inputPath, outputPath string) {
 
 	// 1. Generate new identity (Private + Public)

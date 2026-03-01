@@ -25,13 +25,20 @@ type EnvConfig struct {
 	// The runtime environment.
 	Runtime RuntimeEnv
 
+	// The decrypted AGE secret key used for decryption of embedded files.
+	// This is not stored in the YAML config file.
+	AgeSecretKey string `yaml:"-"`
+
 	// Whether the environment is in debug mode.
 	Debug bool `yaml:"debug"`
 
 	// The path to the private key file, which must be placed in a secure place.
 	PrivateKeyFile string `yaml:"privateKeyFile,omitempty"`
+	PrivateKey     string `yaml:"privateKey,omitempty"`
+
 	// The path to the machine credential file, which must be placed in a secure place.
 	MachineCredentialFile string `yaml:"machineCredentialFile,omitempty"`
+	MachineCredential     string `yaml:"machineCredential,omitempty"`
 
 	// The DID key of the issuer.
 	MyDidkey string `yaml:"mydidkey,omitempty"`
