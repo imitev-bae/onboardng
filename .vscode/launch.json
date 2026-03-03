@@ -26,10 +26,9 @@
             "request": "launch",
             "mode": "auto",
             "program": ".",
+            "env": {"AGE_SECRET_KEY": "AGE-SECRET-KEY-PQ-1S4XHY5D0NRW5NXQ6Y5J724NA5EYQ578U0YGN02TTQ2D9KFJFSFES4GNP79"},
             "args": [
-                "-watch",
-                "-env",
-                "dev"
+                "run"
             ]
         },
         {

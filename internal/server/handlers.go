@@ -24,13 +24,16 @@ type APIResponse struct {
 }
 
 type RegistrationRequest struct {
-	FirstName   string `json:"firstName"`
-	LastName    string `json:"lastName"`
-	CompanyName string `json:"companyName"`
-	Country     string `json:"country"`
-	VatId       string `json:"vatId"`
-	Email       string `json:"email"`
-	Website     string `json:"website"`
+	FirstName     string `json:"firstName"`
+	LastName      string `json:"lastName"`
+	CompanyName   string `json:"companyName"`
+	Country       string `json:"country"`
+	VatId         string `json:"vatId"`
+	StreetAddress string `json:"streetAddress"`
+	PostalCode    string `json:"postalCode"`
+	Email         string `json:"email"`
+	Code          string `json:"code"`
+	Website       string `json:"website"`
 }
 
 // SendJSON utility helper
@@ -183,11 +186,20 @@ func (s *RegistrationRequest) Validate() error {
 	if s.VatId == "" {
 		return fmt.Errorf("VAT ID is required")
 	}
+	if s.StreetAddress == "" {
+		return fmt.Errorf("street address is required")
+	}
+	if s.PostalCode == "" {
+		return fmt.Errorf("postal code is required")
+	}
 	if s.Email == "" {
 		return fmt.Errorf("email is required")
 	}
 	if !isValidEmail(s.Email) {
 		return fmt.Errorf("invalid email address format")
+	}
+	if s.Code == "" {
+		return fmt.Errorf("verification code is required")
 	}
 	return nil
 }
@@ -221,6 +233,12 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		s.SendJSON(w, http.StatusBadRequest, false, err.Error(), nil)
 		return
 	}
+
+	// // Verify the code again to prevent spurious calls
+	// if !s.VerifyCode(requestData.Email, requestData.Code) {
+	// 	s.SendJSON(w, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
+	// 	return
+	// }
 
 	slog.Info("Attempting to issue credential for registration", "email", requestData.Email, "vatID", requestData.VatId)
 
@@ -262,6 +280,8 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		CompanyName:    requestData.CompanyName,
 		Country:        requestData.Country,
 		VatID:          requestData.VatId,
+		StreetAddress:  requestData.StreetAddress,
+		PostalCode:     requestData.PostalCode,
 	}
 
 	// Create an initial registration in the database, updated with error and status later

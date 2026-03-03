@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -25,432 +26,452 @@
 
 <body>
     <header>
-
-        <div class="dome-header">
-            <div class="dome-content">
-                <div class="w3-bar">
-                    <div class="w3-bar-item padding-right-0">
-                        <a href="#">
-                            <img src="assets/logos/DOME_Icon_White.svg" alt="DOME Icon"
-                                style="width:100%;max-height:32px">
-                        </a>
-                    </div>
-                    <div class="w3-bar-item">
-                        <span class="blinker-semibold w3-xlarge nowrap">DOME Marketplace</span>
-                    </div>
-                </div>
+        
+<div class="dome-header">
+    <div class="dome-content">
+        <div class="w3-bar">
+            <div class="w3-bar-item padding-right-0">
+                <a href="#">
+                    <img src="assets/logos/DOME_Icon_White.svg" alt="DOME Icon" style="width:100%;max-height:32px">
+                </a>
+            </div>
+            <div class="w3-bar-item">
+                <span class="blinker-semibold w3-xlarge nowrap">DOME Marketplace</span>
             </div>
         </div>
+    </div>
+</div>
 
     </header>
 
     <main>
         <div style="background-color: #EDF2FA; min-height: 100vh;">
             <div class="w3-padding-32 dome-content">
+                
+<section class="onboarding-form" x-data="onboarding()" x-cloak>
 
-                <section class="onboarding-form" x-data="onboarding()" x-cloak>
+    <h2 class="form-title" x-text="titles[step]"></h2>
 
-                    <h2 class="form-title" x-text="titles[step]"></h2>
+    
+    <div x-show="message" :class="messageType === 'error' ? 'w3-panel w3-red' : 'w3-panel w3-green'">
+        <p x-text="message"></p>
+    </div>
 
+    
+    <div x-show="step === 'email'">
+        <p>Please enter your email to receive a verification code.</p>
+        <form @submit.prevent="sendCode">
+            <div class="w3-row">
+                <div class="w3-third">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Email (*)</label>
+    <input type="email" name="email" x-model="email" class="w3-input w3-border" required>
+</div>
 
-                    <div x-show="message" :class="messageType === 'error' ? 'w3-panel w3-red' : 'w3-panel w3-green'">
-                        <p x-text="message"></p>
+                </div>
+            </div>
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Sending...</span>
+                <span x-show="!loading">Send</span>
+            </button>
+        </form>
+    </div>
+
+    
+    <div x-show="step === 'code'">
+        <p>A code has been sent to <b x-text="email"></b>.</p>
+        <div class="w3-panel w3-yellow">
+            <p><strong>Note:</strong> For testing, we show here the code: <strong><span
+                        x-text="codeValue"></span></strong></p>
+        </div>
+
+        <form @submit.prevent="verifyCode">
+            <div class="w3-row">
+                <div class="w3-third">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Verification Code (*)</label>
+    <input type="text" name="code" x-model="code" class="w3-input w3-border" required>
+</div>
+
+                </div>
+            </div>
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Verifying...</span>
+                <span x-show="!loading">Verify Code</span>
+            </button>
+        </form>
+    </div>
+
+    
+    <div x-show="step === 'register'">
+        <form @submit.prevent="register">
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="w3-input w3-border" :value="email" disabled>
                     </div>
 
+                </div>
 
-                    <div x-show="step === 'email'">
-                        <p>Please enter your email to receive a verification code.</p>
-                        <form @submit.prevent="sendCode">
-                            <div class="w3-row">
-                                <div class="w3-third">
+                <div class="w3-third">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">First Name (*)</label>
+    <input type="text" name="firstName" x-model="formData.firstName" class="w3-input w3-border" required>
+</div>
 
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Email (*)</label>
-                                        <input type="email" name="email" x-model="email" class="w3-input w3-border"
-                                            required>
-                                    </div>
+                </div>
 
-                                </div>
-                            </div>
-                            <button type="submit" :disabled="loading"
-                                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
-                                <span x-show="loading">Sending...</span>
-                                <span x-show="!loading">Send</span>
-                            </button>
-                        </form>
+                <div class="w3-third">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Last Name (*)</label>
+    <input type="text" name="lastName" x-model="formData.lastName" class="w3-input w3-border" required>
+</div>
+
+                </div>
+
+            </div>
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Company Name (*)</label>
+    <input type="text" name="companyName" x-model="formData.companyName" class="w3-input w3-border" required>
+</div>
+
+                </div>
+                <div class="w3-third">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Country of Incorporation (*)</label>
+    <select name="country" x-model="formData.country" class="w3-select w3-border" required>
+        <option value="" disabled selected>Select a country</option>
+        
+        <option value="US">United States</option>
+        
+        <option value="GB">United Kingdom</option>
+        
+        <option value="CA">Canada</option>
+        
+        <option value="AU">Australia</option>
+        
+        <option value="DE">Germany</option>
+        
+        <option value="FR">France</option>
+        
+        <option value="ES">Spain</option>
+        
+        <option value="IT">Italy</option>
+        
+        <option value="NL">Netherlands</option>
+        
+        <option value="BE">Belgium</option>
+        
+        <option value="CH">Switzerland</option>
+        
+        <option value="AT">Austria</option>
+        
+        <option value="SE">Sweden</option>
+        
+        <option value="NO">Norway</option>
+        
+        <option value="DK">Denmark</option>
+        
+        <option value="FI">Finland</option>
+        
+        <option value="IE">Ireland</option>
+        
+        <option value="PT">Portugal</option>
+        
+        <option value="GR">Greece</option>
+        
+        <option value="LU">Luxembourg</option>
+        
+        <option value="JP">Japan</option>
+        
+        <option value="CN">China</option>
+        
+        <option value="IN">India</option>
+        
+        <option value="BR">Brazil</option>
+        
+        <option value="MX">Mexico</option>
+        
+        <option value="ZA">South Africa</option>
+        
+        <option value="AE">United Arab Emirates</option>
+        
+        <option value="SG">Singapore</option>
+        
+        <option value="KR">South Korea</option>
+        
+        <option value="NZ">New Zealand</option>
+        
+    </select>
+</div>
+
+                </div>
+                <div class="w3-third">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">VAT ID (*)</label>
+    <input type="text" name="vatId" x-model="formData.vatId" class="w3-input w3-border" required>
+</div>
+
+                </div>
+            </div>
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-twothird" style="padding-left:0px">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Street Address (*)</label>
+    <input type="text" name="streetAddress" x-model="formData.streetAddress" class="w3-input w3-border" required>
+</div>
+
+                </div>
+                <div class="w3-third">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Postal Code (*)</label>
+    <input type="text" name="postalCode" x-model="formData.postalCode" class="w3-input w3-border" required>
+</div>
+
+                </div>
+            </div>
+
+            
+            <input type="text" name="website" x-model="formData.website" style="display:none" tabindex="-1"
+                autocomplete="off">
+
+            <p class=""><span class=""><b>Information about the processing of personal data is as follows:</b> <a
+                        target="_blank" href="https://dome-project.eu/about/#partners">Data Controller DOME
+                        Marketplace</a>.
+                    Purpose: to send you information about DOME's project by electronic means. Legal basis: data
+                    subject's consent.
+                    Recipients: The personal data collected will not be communicated to third parties, unless requested
+                    by public administrations or if required by law. Exercise of Rights: sending an email to <a
+                        href="mailto:privacy.helpdesk@dome-project.eu">privacy.helpdesk@dome-project.eu</a>,
+                    indicating in the subject line: 'Exercise of rights'. You are also entitled to be assisted by a Data
+                    Protection Authority. Find more information about personal data processing in <a target="_blank"
+                        href="https://dome-marketplace-sbx.org/assets/documents/privacy.pdf">our Privacy Policy
+                        here</a>. </span></p>
+
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Registering...</span>
+                <span x-show="!loading">Complete Registration</span>
+            </button>
+        </form>
+    </div>
+
+
+    
+    <div x-show="step === 'welcome'">
+        <form @submit.prevent="welcome">
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="w3-input w3-border" :value="email" disabled>
                     </div>
 
+                </div>
 
-                    <div x-show="step === 'code'">
-                        <p>A code has been sent to <b x-text="email"></b>.</p>
-                        <div class="w3-panel w3-yellow">
-                            <p><strong>Note:</strong> For testing, we show here the code: <strong><span
-                                        x-text="codeValue"></span></strong></p>
-                        </div>
-
-                        <form @submit.prevent="verifyCode">
-                            <div class="w3-row">
-                                <div class="w3-third">
-
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Verification Code (*)</label>
-                                        <input type="text" name="code" x-model="code" class="w3-input w3-border"
-                                            required>
-                                    </div>
-
-                                </div>
-                            </div>
-                            <button type="submit" :disabled="loading"
-                                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
-                                <span x-show="loading">Verifying...</span>
-                                <span x-show="!loading">Verify Code</span>
-                            </button>
-                        </form>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">First Name (*)</label>
+                        <input type="text" name="firstName" :value="formData.firstName" class="w3-input w3-border"
+                            disabled>
                     </div>
+                </div>
 
-
-                    <div x-show="step === 'register'">
-                        <form @submit.prevent="register">
-
-                            <div class="w3-row-padding" style="padding-left:0px">
-                                <div class="w3-third" style="padding-left:0px">
-
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Email</label>
-                                        <input type="email" class="w3-input w3-border" :value="email" disabled>
-                                    </div>
-
-                                </div>
-
-                                <div class="w3-third">
-
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">First Name (*)</label>
-                                        <input type="text" name="firstName" x-model="formData.firstName"
-                                            class="w3-input w3-border" required>
-                                    </div>
-
-                                </div>
-
-                                <div class="w3-third">
-
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Last Name (*)</label>
-                                        <input type="text" name="lastName" x-model="formData.lastName"
-                                            class="w3-input w3-border" required>
-                                    </div>
-
-                                </div>
-
-                            </div>
-
-                            <div class="w3-row-padding" style="padding-left:0px">
-                                <div class="w3-third" style="padding-left:0px">
-
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Company Name (*)</label>
-                                        <input type="text" name="companyName" x-model="formData.companyName"
-                                            class="w3-input w3-border" required>
-                                    </div>
-
-                                </div>
-                                <div class="w3-third">
-
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Country of Incorporation (*)</label>
-                                        <select name="country" x-model="formData.country" class="w3-select w3-border"
-                                            required>
-                                            <option value="" disabled selected>Select a country</option>
-
-                                            <option value="US">United States</option>
-
-                                            <option value="GB">United Kingdom</option>
-
-                                            <option value="CA">Canada</option>
-
-                                            <option value="AU">Australia</option>
-
-                                            <option value="DE">Germany</option>
-
-                                            <option value="FR">France</option>
-
-                                            <option value="ES">Spain</option>
-
-                                            <option value="IT">Italy</option>
-
-                                            <option value="NL">Netherlands</option>
-
-                                            <option value="BE">Belgium</option>
-
-                                            <option value="CH">Switzerland</option>
-
-                                            <option value="AT">Austria</option>
-
-                                            <option value="SE">Sweden</option>
-
-                                            <option value="NO">Norway</option>
-
-                                            <option value="DK">Denmark</option>
-
-                                            <option value="FI">Finland</option>
-
-                                            <option value="IE">Ireland</option>
-
-                                            <option value="PT">Portugal</option>
-
-                                            <option value="GR">Greece</option>
-
-                                            <option value="LU">Luxembourg</option>
-
-                                            <option value="JP">Japan</option>
-
-                                            <option value="CN">China</option>
-
-                                            <option value="IN">India</option>
-
-                                            <option value="BR">Brazil</option>
-
-                                            <option value="MX">Mexico</option>
-
-                                            <option value="ZA">South Africa</option>
-
-                                            <option value="AE">United Arab Emirates</option>
-
-                                            <option value="SG">Singapore</option>
-
-                                            <option value="KR">South Korea</option>
-
-                                            <option value="NZ">New Zealand</option>
-
-                                        </select>
-                                    </div>
-
-                                </div>
-                                <div class="w3-third">
-
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">VAT ID (*)</label>
-                                        <input type="text" name="vatId" x-model="formData.vatId"
-                                            class="w3-input w3-border" required>
-                                    </div>
-
-                                </div>
-                            </div>
-
-
-                            <input type="text" name="website" x-model="formData.website" style="display:none"
-                                tabindex="-1" autocomplete="off">
-
-                            <p class=""><span class=""><b>Information about the processing of personal data is as
-                                        follows:</b> <a target="_blank"
-                                        href="https://dome-project.eu/about/#partners">Data Controller DOME
-                                        Marketplace</a>.
-                                    Purpose: to send you information about DOME's project by electronic means. Legal
-                                    basis: data
-                                    subject's consent.
-                                    Recipients: The personal data collected will not be communicated to third parties,
-                                    unless requested
-                                    by public administrations or if required by law. Exercise of Rights: sending an
-                                    email to <a
-                                        href="mailto:privacy.helpdesk@dome-project.eu">privacy.helpdesk@dome-project.eu</a>,
-                                    indicating in the subject line: 'Exercise of rights'. You are also entitled to be
-                                    assisted by a Data
-                                    Protection Authority. Find more information about personal data processing in <a
-                                        target="_blank"
-                                        href="https://dome-marketplace-sbx.org/assets/documents/privacy.pdf">our Privacy
-                                        Policy
-                                        here</a>. </span></p>
-
-                            <button type="submit" :disabled="loading"
-                                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
-                                <span x-show="loading">Registering...</span>
-                                <span x-show="!loading">Complete Registration</span>
-                            </button>
-                        </form>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Last Name (*)</label>
+                        <input type="text" name="lastName" :value="formData.lastName" class="w3-input w3-border"
+                            disabled>
                     </div>
+                </div>
 
+            </div>
 
-
-                    <div x-show="step === 'welcome'">
-                        <form @submit.prevent="welcome">
-
-                            <div class="w3-row-padding" style="padding-left:0px">
-                                <div class="w3-third" style="padding-left:0px">
-
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Email</label>
-                                        <input type="email" class="w3-input w3-border" :value="email" disabled>
-                                    </div>
-
-                                </div>
-
-                                <div class="w3-third">
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">First Name (*)</label>
-                                        <input type="text" name="firstName" :value="formData.firstName"
-                                            class="w3-input w3-border" disabled>
-                                    </div>
-                                </div>
-
-                                <div class="w3-third">
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Last Name (*)</label>
-                                        <input type="text" name="lastName" :value="formData.lastName"
-                                            class="w3-input w3-border" disabled>
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            <div class="w3-row-padding" style="padding-left:0px">
-                                <div class="w3-third" style="padding-left:0px">
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Company Name (*)</label>
-                                        <input type="text" name="companyName" :value="formData.companyName"
-                                            class="w3-input w3-border" disabled>
-                                    </div>
-                                </div>
-                                <div class="w3-third">
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">Country of Incorporation (*)</label>
-                                        <input type="text" name="country" :value="formData.country"
-                                            class="w3-input w3-border" disabled>
-                                    </div>
-                                </div>
-                                <div class="w3-third">
-                                    <div class="form-group w3-margin-bottom">
-                                        <label class="form-label">VAT ID (*)</label>
-                                        <input type="text" name="vatId" :value="formData.vatId"
-                                            class="w3-input w3-border" disabled>
-                                    </div>
-                                </div>
-                            </div>
-
-
-                            <input type="text" name="website" x-model="formData.website" style="display:none"
-                                tabindex="-1" autocomplete="off">
-
-                            <button type="submit" :disabled="loading"
-                                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
-                                <span x-show="loading">Registering...</span>
-                                <span x-show="!loading">Go to DOME Marketplace</span>
-                            </button>
-                        </form>
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Company Name (*)</label>
+                        <input type="text" name="companyName" :value="formData.companyName" class="w3-input w3-border"
+                            disabled>
                     </div>
+                </div>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Country of Incorporation (*)</label>
+                        <input type="text" name="country" :value="formData.country" class="w3-input w3-border" disabled>
+                    </div>
+                </div>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">VAT ID (*)</label>
+                        <input type="text" name="vatId" :value="formData.vatId" class="w3-input w3-border" disabled>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-twothird" style="padding-left:0px">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Street Address (*)</label>
+                        <input type="text" name="streetAddress" :value="formData.streetAddress"
+                            class="w3-input w3-border" disabled>
+                    </div>
+                </div>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Postal Code (*)</label>
+                        <input type="text" name="postalCode" :value="formData.postalCode" class="w3-input w3-border"
+                            disabled>
+                    </div>
+                </div>
+            </div>
+
+            
+            <input type="text" name="website" x-model="formData.website" style="display:none" tabindex="-1"
+                autocomplete="off">
+
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Registering...</span>
+                <span x-show="!loading">Go to DOME Marketplace</span>
+            </button>
+        </form>
+    </div>
 
 
-                </section>
+</section>
 
-                <script>
-                    function onboarding() {
-                        return {
-                            step: 'email',
-                            email: '',
-                            code: '',
-                            formData: {
-                                firstName: '',
-                                lastName: '',
-                                companyName: '',
-                                country: '',
-                                vatId: '',
-                                website: ''
-                            },
-                            loading: false,
-                            message: '',
-                            messageType: '',
-                            codeValue: '',
-                            titles: {
-                                'email': 'Register in DOME Marketplace',
-                                'code': 'Verify Your Email',
-                                'register': 'Please fill this form to register',
-                                'welcome': 'Welcome to DOME Marketplace'
-                            },
+<script>
+    function onboarding() {
+        return {
+            step: 'email',
+            email: '',
+            code: '',
+            formData: {
+                firstName: '',
+                lastName: '',
+                companyName: '',
+                country: '',
+                vatId: '',
+                streetAddress: '',
+                postalCode: '',
+                website: '' 
+            },
+            loading: false,
+            message: '',
+            messageType: '',
+            codeValue: '',
+            titles: {
+                'email': 'Register in DOME Marketplace',
+                'code': 'Verify Your Email',
+                'register': 'Please fill this form to register',
+                'welcome': 'Welcome to DOME Marketplace'
+            },
 
-                            async callApi(endpoint, body) {
-                                this.loading = true;
-                                this.message = '';
-                                try {
-                                    const res = await fetch(this.API_url() + endpoint, {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-Requested-With': 'XMLHttpRequest'
-                                        },
-                                        body: JSON.stringify(body)
-                                    });
-                                    const data = await res.json();
-                                    if (!data.success) {
-                                        throw new Error(data.message || 'Unknown error');
-                                    }
-                                    return data;
-                                } catch (err) {
-                                    this.message = err.message;
-                                    this.messageType = 'error';
-                                    return null;
-                                } finally {
-                                    this.loading = false;
-                                }
-                            },
-
-                            async sendCode() {
-                                const data = await this.callApi('/api/validate-email', { email: this.email });
-                                if (data) {
-
-                                    this.codeValue = data.data.code;
-                                    this.step = 'code';
-                                }
-                            },
-
-                            async verifyCode() {
-                                const data = await this.callApi('/api/verify-code', { email: this.email, code: this.code });
-                                if (data) {
-                                    this.step = 'register';
-                                    this.message = '';
-                                }
-                            },
-
-                            async register() {
-
-                                const body = { ...this.formData, email: this.email };
-                                const data = await this.callApi('/api/register', body);
-                                if (data) {
-                                    this.message = 'Registration successful! Your registration is being processed.';
-                                    this.messageType = 'success';
-                                    this.step = 'welcome';
-
-                                }
-                            },
-
-                            async welcome() {
-                                if (window.location.hostname.includes('onboard.sbx.evidenceledger.eu')) {
-                                    window.location.href = 'https://dome-marketplace-sbx.org';
-                                    return;
-                                }
-                                if (window.location.hostname.includes('onboarddev.dome.mycredential.eu')) {
-                                    window.location.href = 'https://dome-marketplace-sbx.org';
-                                    return;
-                                }
-
-                                return;
-                            },
-
-                            frontURLs: {
-                                pro: 'dome-marketplace.github.io/onboarding',
-                                pre: 'dome-marketplace.github.io/onboarding-pre'
-                            },
-
-                            API_url() {
-                                if (window.location.hostname.includes(this.frontURLs.pro)) {
-                                    return 'https://onboarddome.evidenceledger.eu';
-                                }
-                                if (window.location.hostname.includes(this.frontURLs.pre)) {
-                                    return 'https://onboarddev.dome.mycredential.eu';
-                                }
-                                return window.location.origin;
-                            }
-                        }
+            async callApi(endpoint, body) {
+                this.loading = true;
+                this.message = '';
+                try {
+                    const res = await fetch(this.API_url() + endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest' 
+                        },
+                        body: JSON.stringify(body)
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        throw new Error(data.message || 'Unknown error');
                     }
-                </script>
+                    return data;
+                } catch (err) {
+                    this.message = err.message;
+                    this.messageType = 'error';
+                    return null;
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async sendCode() {
+                const data = await this.callApi('/api/validate-email', { email: this.email });
+                if (data) {
+                    
+                    this.codeValue = data.data.code;
+                    this.step = 'code';
+                }
+            },
+
+            async verifyCode() {
+                const data = await this.callApi('/api/verify-code', { email: this.email, code: this.code });
+                if (data) {
+                    this.step = 'register';
+                    this.message = '';
+                }
+            },
+
+            async register() {
+                
+                const body = {
+                    ...this.formData,
+                    email: this.email,
+                    code: this.code
+                };
+                const data = await this.callApi('/api/register', body);
+                if (data) {
+                    this.message = 'Registration successful! Your registration is being processed.';
+                    this.messageType = 'success';
+                    this.step = 'welcome';
+                    
+                }
+            },
+
+            async welcome() {
+                if (widow.location.hostname.includes('onboard.sbx.evidenceledger.eu')) {
+                    window.location.href = 'https://dome-marketplace-sbx.org';
+                    return;
+                }
+                return;
+            },
+
+            frontURLs: {
+                pro: 'dome-marketplace.github.io/onboarding',
+                pre: 'dome-marketplace.github.io/onboarding-pre'
+            },
+
+            API_url() {
+                if (window.location.hostname.includes(this.frontURLs.pro)) {
+                    return 'https://onboarddome.evidenceledger.eu';
+                }
+                if (window.location.hostname.includes(this.frontURLs.pre)) {
+                    return 'https://onboarddev.dome.mycredential.eu';
+                }
+                return window.location.origin;
+            }
+        }
+    }
+</script>
 
             </div>
         </div>
@@ -458,7 +479,7 @@
 
     <footer>
         <div class="dome-content">
-
+            
         </div>
     </footer>
 
