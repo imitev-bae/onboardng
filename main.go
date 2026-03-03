@@ -9,6 +9,7 @@ import (
 
 func main() {
 
+	// Invoke the real application, which can return an error
 	if err := mainapp.Run(); err != nil {
 		slog.Error("❌ Error running application", "error", err)
 		os.Exit(1)

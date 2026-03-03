@@ -23,6 +23,10 @@ func TokenRequest(
 	privateKey *ecdsa.PrivateKey,
 ) (string, error) {
 
+	fmt.Println("Machine Credential:")
+	fmt.Println(machineCredential)
+	fmt.Println("===")
+
 	// The assertion to authenticate to the token endpoint
 	cliAssertion, err := NewCliAssertion(machineCredential, didkey, verifierURL, privateKey)
 	if err != nil {

@@ -21,6 +21,8 @@ type RegistrationRecord struct {
 	CompanyName     string    `json:"company_name"`
 	Country         string    `json:"country"`
 	VatID           string    `json:"vat_id"`
+	StreetAddress   string    `json:"street_address"`
+	PostalCode      string    `json:"postal_code"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 	IssuanceAt      time.Time `json:"issuance_at,omitempty"`
@@ -62,6 +64,8 @@ func NewService(runtime configuration.RuntimeEnv) (*Service, error) {
 		company_name TEXT,
 		country TEXT,
 		vat_id TEXT UNIQUE,
+		street_address TEXT,
+		postal_code TEXT,
 		created_at DATETIME,
 		updated_at DATETIME,
 		issuance_at DATETIME,
@@ -85,8 +89,9 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 	insertQuery := `
 	INSERT INTO registrations (
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
+		street_address, postal_code,
 		created_at, updated_at, issuance_at, issuance_error, notif_email_at, notif_email_error
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	now := time.Now()
 	reg.CreatedAt = now
@@ -114,6 +119,7 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 			// If the registration does not exist, we insert it
 			_, err := s.conn.Exec(insertQuery,
 				reg.RegistrationID, reg.Email, reg.FirstName, reg.LastName, reg.CompanyName, reg.Country, reg.VatID,
+				reg.StreetAddress, reg.PostalCode,
 				reg.CreatedAt, reg.UpdatedAt, reg.IssuanceAt, reg.IssuanceError, reg.NotifEmailAt, reg.NotifEmailError,
 			)
 			return err
@@ -123,6 +129,7 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 		// In production, we always insert the registration and fail if the vatID or email already exists
 		_, err := s.conn.Exec(insertQuery,
 			reg.RegistrationID, reg.Email, reg.FirstName, reg.LastName, reg.CompanyName, reg.Country, reg.VatID,
+			reg.StreetAddress, reg.PostalCode,
 			reg.CreatedAt, reg.UpdatedAt, reg.IssuanceAt, reg.IssuanceError, reg.NotifEmailAt, reg.NotifEmailError,
 		)
 		return err
@@ -158,6 +165,8 @@ func (s *Service) AmendRegistration(reg *RegistrationRecord) error {
 		last_name = ?,
 		company_name = ?,
 		country = ?,
+		street_address = ?,
+		postal_code = ?,
 		updated_at = ?,
 		issuance_at = ?,
 		issuance_error = ?,
@@ -167,6 +176,7 @@ func (s *Service) AmendRegistration(reg *RegistrationRecord) error {
 	_, err := s.conn.Exec(query,
 		reg.RegistrationID,
 		reg.FirstName, reg.LastName, reg.CompanyName, reg.Country,
+		reg.StreetAddress, reg.PostalCode,
 		reg.UpdatedAt,
 		reg.IssuanceAt, reg.IssuanceError, reg.NotifEmailAt, reg.NotifEmailError,
 		reg.Email, reg.VatID,
@@ -178,6 +188,7 @@ func (s *Service) GetRegistrations(limit, offset int) ([]RegistrationRecord, err
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
+		street_address, postal_code,
 		created_at, updated_at, issuance_at, issuance_error, notif_email_at, notif_email_error
 	FROM registrations
 	ORDER BY created_at DESC
@@ -194,6 +205,7 @@ func (s *Service) GetRegistrations(limit, offset int) ([]RegistrationRecord, err
 		var reg RegistrationRecord
 		err := rows.Scan(
 			&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
+			&reg.StreetAddress, &reg.PostalCode,
 			&reg.CreatedAt, &reg.UpdatedAt, &reg.IssuanceAt, &reg.IssuanceError, &reg.NotifEmailAt, &reg.NotifEmailError,
 		)
 		if err != nil {
@@ -213,6 +225,7 @@ func (s *Service) GetRegistration(vatID string, email string) (*RegistrationReco
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
+		street_address, postal_code,
 		created_at, updated_at, issuance_at, issuance_error, notif_email_at, notif_email_error
 	FROM registrations
 	WHERE vat_id = ? AND email = ?`
@@ -220,6 +233,7 @@ func (s *Service) GetRegistration(vatID string, email string) (*RegistrationReco
 	var reg RegistrationRecord
 	err := s.conn.QueryRow(query, vatID, email).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
+		&reg.StreetAddress, &reg.PostalCode,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.IssuanceAt, &reg.IssuanceError, &reg.NotifEmailAt, &reg.NotifEmailError,
 	)
 	if err != nil {

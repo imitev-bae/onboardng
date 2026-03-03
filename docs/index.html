@@ -230,6 +230,25 @@
                 </div>
             </div>
 
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-twothird" style="padding-left:0px">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Street Address (*)</label>
+    <input type="text" name="streetAddress" x-model="formData.streetAddress" class="w3-input w3-border" required>
+</div>
+
+                </div>
+                <div class="w3-third">
+                    
+<div class="form-group w3-margin-bottom">
+    <label class="form-label">Postal Code (*)</label>
+    <input type="text" name="postalCode" x-model="formData.postalCode" class="w3-input w3-border" required>
+</div>
+
+                </div>
+            </div>
+
             
             <input type="text" name="website" x-model="formData.website" style="display:none" tabindex="-1"
                 autocomplete="off">
@@ -255,6 +274,91 @@
         </form>
     </div>
 
+
+    
+    <div x-show="step === 'welcome'">
+        <form @submit.prevent="welcome">
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="w3-input w3-border" :value="email" disabled>
+                    </div>
+
+                </div>
+
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">First Name (*)</label>
+                        <input type="text" name="firstName" :value="formData.firstName" class="w3-input w3-border"
+                            disabled>
+                    </div>
+                </div>
+
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Last Name (*)</label>
+                        <input type="text" name="lastName" :value="formData.lastName" class="w3-input w3-border"
+                            disabled>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-third" style="padding-left:0px">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Company Name (*)</label>
+                        <input type="text" name="companyName" :value="formData.companyName" class="w3-input w3-border"
+                            disabled>
+                    </div>
+                </div>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Country of Incorporation (*)</label>
+                        <input type="text" name="country" :value="formData.country" class="w3-input w3-border" disabled>
+                    </div>
+                </div>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">VAT ID (*)</label>
+                        <input type="text" name="vatId" :value="formData.vatId" class="w3-input w3-border" disabled>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w3-row-padding" style="padding-left:0px">
+                <div class="w3-twothird" style="padding-left:0px">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Street Address (*)</label>
+                        <input type="text" name="streetAddress" :value="formData.streetAddress"
+                            class="w3-input w3-border" disabled>
+                    </div>
+                </div>
+                <div class="w3-third">
+                    <div class="form-group w3-margin-bottom">
+                        <label class="form-label">Postal Code (*)</label>
+                        <input type="text" name="postalCode" :value="formData.postalCode" class="w3-input w3-border"
+                            disabled>
+                    </div>
+                </div>
+            </div>
+
+            
+            <input type="text" name="website" x-model="formData.website" style="display:none" tabindex="-1"
+                autocomplete="off">
+
+            <button type="submit" :disabled="loading"
+                class="w3-btn dome-bgcolor w3-round-large w3-margin-right blinker-semibold">
+                <span x-show="loading">Registering...</span>
+                <span x-show="!loading">Go to DOME Marketplace</span>
+            </button>
+        </form>
+    </div>
+
+
 </section>
 
 <script>
@@ -269,6 +373,8 @@
                 companyName: '',
                 country: '',
                 vatId: '',
+                streetAddress: '',
+                postalCode: '',
                 website: '' 
             },
             loading: false,
@@ -278,7 +384,8 @@
             titles: {
                 'email': 'Register in DOME Marketplace',
                 'code': 'Verify Your Email',
-                'register': 'Please fill this form to register'
+                'register': 'Please fill this form to register',
+                'welcome': 'Welcome to DOME Marketplace'
             },
 
             async callApi(endpoint, body) {
@@ -326,13 +433,26 @@
 
             async register() {
                 
-                const body = { ...this.formData, email: this.email };
+                const body = {
+                    ...this.formData,
+                    email: this.email,
+                    code: this.code
+                };
                 const data = await this.callApi('/api/register', body);
                 if (data) {
                     this.message = 'Registration successful! Your registration is being processed.';
                     this.messageType = 'success';
+                    this.step = 'welcome';
                     
                 }
+            },
+
+            async welcome() {
+                if (widow.location.hostname.includes('onboard.sbx.evidenceledger.eu')) {
+                    window.location.href = 'https://dome-marketplace-sbx.org';
+                    return;
+                }
+                return;
             },
 
             frontURLs: {
@@ -347,7 +467,7 @@
                 if (window.location.hostname.includes(this.frontURLs.pre)) {
                     return 'https://onboarddev.dome.mycredential.eu';
                 }
-                return 'https://onboarddev.dome.mycredential.eu';
+                return window.location.origin;
             }
         }
     }
