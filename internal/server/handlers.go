@@ -234,11 +234,12 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// // Verify the code again to prevent spurious calls
-	// if !s.VerifyCode(requestData.Email, requestData.Code) {
-	// 	s.SendJSON(w, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
-	// 	return
-	// }
+	// Verify the code again to prevent spurious calls
+	if !s.VerifyCode(requestData.Email, requestData.Code) {
+		s.SendJSON(w, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
+		return
+	}
+	s.DeleteVerificationCode(requestData.Email)
 
 	slog.Info("Attempting to issue credential for registration", "email", requestData.Email, "vatID", requestData.VatId)
 
