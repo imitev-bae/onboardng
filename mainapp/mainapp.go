@@ -3,6 +3,7 @@ package mainapp
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -179,7 +180,7 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 	}
 
 	// Initialize Database service
-	dbService, err := db.NewService(runtimeEnv)
+	dbService, err := db.NewService(runtimeEnv, "data/onboarding.db")
 	if err != nil {
 		slog.Error("❌ Error initializing database service", "error", errl.Error(err))
 		return err
@@ -272,8 +273,13 @@ func loadEncryptedConfig(path string, secretKey string) configuration.Config {
 		log.Fatalf("Error: Failed to parse YAML: %v", err)
 	}
 
-	// 3. Start Application
-	fmt.Printf("Successfully loaded config from %s\n", path)
+	// 3. Start Application - Pretty print the config in JSON format
+	jsonConfig, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		log.Fatalf("Error: Failed to marshal config: %v", err)
+	}
+	fmt.Println(string(jsonConfig))
+
 	return cfg
 }
 
