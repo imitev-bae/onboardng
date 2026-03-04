@@ -3,6 +3,8 @@ package mainapp
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -244,7 +246,17 @@ func loadEncryptedConfig(path string, secretKey string) configuration.Config {
 	}
 	defer source.Close()
 
-	var reader io.Reader
+	// Read the entire source into memory to calculate the hash
+	configBytes, err := io.ReadAll(source)
+	if err != nil {
+		log.Fatalf("Error: Could not read config source: %v", err)
+	}
+
+	// Calculate and print SHA256 hash
+	hash := sha256.Sum256(configBytes)
+	fmt.Printf("Config file SHA256: %s\n", hex.EncodeToString(hash[:]))
+
+	var reader io.Reader = bytes.NewReader(configBytes)
 	if strings.HasSuffix(path, ".age") {
 		// Decryption mode
 		if secretKey == "" {
@@ -256,14 +268,13 @@ func loadEncryptedConfig(path string, secretKey string) configuration.Config {
 			log.Fatalf("Error: Invalid identity key: %v", err)
 		}
 
-		ageReader, err := age.Decrypt(source, identity)
+		ageReader, err := age.Decrypt(reader, identity)
 		if err != nil {
 			log.Fatalf("Error: Failed to decrypt file: %v", err)
 		}
 		reader = ageReader
 	} else {
 		// Standard YAML mode (Development)
-		reader = source
 		slog.Warn("Running in Development Mode (Unencrypted YAML)")
 	}
 
@@ -448,7 +459,6 @@ func startWatcher(cfg configuration.Config) {
 
 	watchPaths := []string{
 		cfg.SrcDir,
-		"config.yaml",
 	}
 
 	for _, path := range watchPaths {
