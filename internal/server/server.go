@@ -38,7 +38,8 @@ func NewServer(dbService *db.Service, issuer *credissuance.LEARIssuance, mailSer
 	mux := http.NewServeMux()
 
 	// Static file serving
-	fileServer := http.FileServer(http.Dir(staticFilesDir))
+	// fileServer := http.FileServer(http.Dir(staticFilesDir))
+	fileServer := http.FileServer(http.Dir("dist/browser"))
 	mux.Handle("/", fileServer)
 
 	// API Routes
