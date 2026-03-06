@@ -85,6 +85,17 @@ type LEARIssuance struct {
 	verifierURL            string
 	myDidkey               string
 	credentialIssuancePath string
+	tmForumURL             string
+}
+
+func (l *LEARIssuance) GetAccessToken() (string, error) {
+	return TokenRequest(
+		l.verifierTokenEndpoint,
+		l.machineCredential,
+		l.myDidkey,
+		l.verifierURL,
+		l.privateKey,
+	)
 }
 
 func NewLEARIssuance(config configuration.EnvConfig) (*LEARIssuance, error) {
@@ -210,26 +221,19 @@ func NewLEARIssuance(config configuration.EnvConfig) (*LEARIssuance, error) {
 	l.verifierURL = config.Verifier.URL
 	l.myDidkey = config.MyDidkey
 	l.credentialIssuancePath = config.Issuer.CredentialIssuancePath
+	l.tmForumURL = config.TMForum.BaseURL
 
 	return l, nil
 
 }
 
-func (l *LEARIssuance) LEARIssuanceRequest(learCredData *LEARIssuanceRequestBody) ([]byte, error) {
+func (l *LEARIssuance) LEARIssuanceRequest(accessToken string, learCredData *LEARIssuanceRequestBody) ([]byte, error) {
 
-	// Get an access token from the Verifier
-	access_token, err := TokenRequest(
-		l.verifierTokenEndpoint,
-		l.machineCredential,
-		l.myDidkey,
-		l.verifierURL,
-		l.privateKey,
-	)
-	if err != nil {
-		return nil, errl.Errorf("error getting access token: %w", err)
+	if accessToken == "" {
+		return nil, errl.Errorf("access token is required for LEARIssuanceRequest")
 	}
 
-	fmt.Printf("Access Token: %v\n", access_token)
+	fmt.Printf("Access Token: %v\n", accessToken)
 	fmt.Printf("Issuance Endpoint: %v\n", l.credentialIssuancePath)
 
 	// The request buffer
@@ -242,7 +246,9 @@ func (l *LEARIssuance) LEARIssuanceRequest(learCredData *LEARIssuanceRequestBody
 	// The request to send
 	req, _ := http.NewRequest("POST", l.credentialIssuancePath, requestBody)
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer "+access_token)
+	if accessToken != "" {
+		req.Header.Add("Authorization", "Bearer "+accessToken)
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

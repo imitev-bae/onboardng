@@ -174,6 +174,9 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 		Issuer: configuration.IssuerConfig{
 			CredentialIssuancePath: srvConfig.Issuer.CredentialIssuancePath,
 		},
+		TMForum: configuration.TMForumConfig{
+			BaseURL: srvConfig.TMForum.BaseURL,
+		},
 	}
 	issuanceService, err := credissuance.NewLEARIssuance(issuerCfg)
 	if err != nil {
@@ -317,6 +320,13 @@ func sealConfig(inputPath, outputPath string) error {
 	}
 	publicKey := identity.Recipient()
 
+	// Save the private key to a file in the config/ directory
+	// This directory is ignored by git
+	secretKeyPath := filepath.Join("config", "age_secret_key.txt")
+	if err := os.WriteFile(secretKeyPath, []byte(identity.String()), 0600); err != nil {
+		return errl.Errorf("failed to save private key to %s: %w", secretKeyPath, err)
+	}
+
 	// Encrypt private key and machine credential for each environment
 	// Encrypt also the SMTP password
 	for name, env := range cfg.Environments {
@@ -365,10 +375,12 @@ func sealConfig(inputPath, outputPath string) error {
 	fmt.Println("=======================================================================")
 	fmt.Printf("Encrypted File: %s\n", outputPath)
 	fmt.Printf("Private Key:    %s\n", identity.String())
+	fmt.Printf("Key saved in:   %s (GIT-IGNORED)\n", secretKeyPath)
 	fmt.Println("=======================================================================")
 	fmt.Println("ACTION REQUIRED:")
 	fmt.Println("1. Commit the .age file to your repository.")
 	fmt.Println("2. Set the Private Key as AGE_SECRET_KEY in your environment.")
+	fmt.Printf("   (Or use the saved key in %s)\n", secretKeyPath)
 	fmt.Println("3. DO NOT LOSE THIS KEY. It cannot be recovered.")
 	fmt.Println("=======================================================================")
 
@@ -398,55 +410,6 @@ func sealFile(inputPath string, publicKey age.Recipient) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
-}
-
-// executeSeal encrypts a file using age encryption
-func executeSeal(inputPath, outputPath string) {
-
-	// 1. Generate new identity (Private + Public)
-	identity, err := age.GenerateHybridIdentity()
-	if err != nil {
-		log.Fatalf("Error: Key generation failed: %v", err)
-	}
-	publicKey := identity.Recipient()
-
-	// 2. Open input file
-	inputFile, err := os.Open(inputPath)
-	if err != nil {
-		log.Fatalf("Error: Cannot open source file: %v", err)
-	}
-	defer inputFile.Close()
-
-	// 3. Create output file
-	outputFile, err := os.Create(outputPath)
-	if err != nil {
-		log.Fatalf("Error: Cannot create output file: %v", err)
-	}
-	defer outputFile.Close()
-
-	// 4. Encrypt
-	ageWriter, err := age.Encrypt(outputFile, publicKey)
-	if err != nil {
-		log.Fatalf("Error: Encryption setup failed: %v", err)
-	}
-
-	if _, err := io.Copy(ageWriter, inputFile); err != nil {
-		log.Fatalf("Error: Failed during encryption stream: %v", err)
-	}
-	ageWriter.Close() // Flush buffers
-
-	// 5. Present the credentials to the user
-	fmt.Println("=======================================================================")
-	fmt.Println("✅ CONFIGURATION SEALED WITH POST-QUANTUM ENCRYPTION (MLKEM768-X25519)")
-	fmt.Println("=======================================================================")
-	fmt.Printf("Encrypted File: %s\n", outputPath)
-	fmt.Printf("Private Key:    %s\n", identity.String())
-	fmt.Println("=======================================================================")
-	fmt.Println("ACTION REQUIRED:")
-	fmt.Println("1. Commit the .age file to your repository.")
-	fmt.Println("2. Set the Private Key as AGE_SECRET_KEY in your environment.")
-	fmt.Println("3. DO NOT LOSE THIS KEY. It cannot be recovered.")
-	fmt.Println("=======================================================================")
 }
 
 func startWatcher(cfg configuration.Config) {
