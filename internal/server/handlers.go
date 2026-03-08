@@ -38,7 +38,8 @@ type RegistrationRequest struct {
 }
 
 // SendJSON utility helper
-func (s *Server) SendJSON(w http.ResponseWriter, status int, success bool, message string, data any) {
+func (s *Server) SendJSON(w http.ResponseWriter, r *http.Request, status int, success bool, message string, data any) {
+	slog.Info("Exit", "method", r.Method, "url", r.URL.Path, "status", status)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(APIResponse{
@@ -94,7 +95,7 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !validateCSRF(r) {
-		s.SendJSON(w, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
+		s.SendJSON(w, r, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
 		return
 	}
 
@@ -102,18 +103,18 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid request body", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid request body", nil)
 		return
 	}
 
 	if req.Email == "" || !isValidEmail(req.Email) {
-		s.SendJSON(w, http.StatusBadRequest, false, "A valid email is required", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "A valid email is required", nil)
 		return
 	}
 
 	// Rate limiting
 	if !s.RegisterEmailAttempt(req.Email) {
-		s.SendJSON(w, http.StatusTooManyRequests, false, "Too many requests. Please wait a few minutes.", nil)
+		s.SendJSON(w, r, http.StatusTooManyRequests, false, "Too many requests. Please wait a few minutes.", nil)
 		return
 	}
 
@@ -128,7 +129,7 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	s.SendJSON(w, http.StatusOK, true, "Validation code sent to your email", map[string]string{"code": code})
+	s.SendJSON(w, r, http.StatusOK, true, "Validation code sent to your email", map[string]string{"code": code})
 }
 
 func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +139,7 @@ func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !validateCSRF(r) {
-		s.SendJSON(w, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
+		s.SendJSON(w, r, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
 		return
 	}
 
@@ -147,16 +148,16 @@ func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		Code  string `json:"code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid request body", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid request body", nil)
 		return
 	}
 
 	if !s.VerifyCode(req.Email, req.Code) {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid verification code", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid verification code", nil)
 		return
 	}
 
-	s.SendJSON(w, http.StatusOK, true, "Email verified successfully", nil)
+	s.SendJSON(w, r, http.StatusOK, true, "Email verified successfully", nil)
 }
 
 // HandleHealth returns a simple 200 OK response for health checks
@@ -165,7 +166,7 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	s.SendJSON(w, http.StatusOK, true, "OK", nil)
+	s.SendJSON(w, r, http.StatusOK, true, "OK", nil)
 }
 
 func (s *RegistrationRequest) Validate() error {
@@ -218,30 +219,30 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !validateCSRF(r) {
-		s.SendJSON(w, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
+		s.SendJSON(w, r, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
 		return
 	}
 
 	var requestData RegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid request body", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid request body", nil)
 		return
 	}
 
 	if requestData.Website != "" {
 		slog.Info("🤖 Bot detected via honeypot field")
-		s.SendJSON(w, http.StatusOK, true, "Registration successful", nil)
+		s.SendJSON(w, r, http.StatusOK, true, "Registration successful", nil)
 		return
 	}
 
 	if err := requestData.Validate(); err != nil {
-		s.SendJSON(w, http.StatusBadRequest, false, err.Error(), nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, err.Error(), nil)
 		return
 	}
 
 	// Verify the code again to prevent spurious calls
 	if !s.VerifyCode(requestData.Email, requestData.Code) {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
 		return
 	}
 	s.DeleteVerificationCode(requestData.Email)
@@ -252,13 +253,32 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	// Perform the registration
 	//
 
+	// Get an access token to authenticate in the Issuer and TM Forum APIs
+	token, err := s.Issuer.GetAccessToken()
+	if err != nil {
+		err = errl.Errorf("Failed to get access token for credential issuance: %v", err)
+		slog.Error("❌ Error getting access token", "error", err)
+		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error getting access token", err.Error())
+		return
+	}
+
+	// Check in the TMF server if the organization already exists
+	existingOrgs, _ := s.Issuer.TMFGetOrganizationByELSI(token, requestData.VatId)
+	if len(existingOrgs) > 0 {
+		slog.Info("Organization already exists in TMF server", "vatId", requestData.VatId)
+		s.SendJSON(w, r, http.StatusConflict, false, "Organization already exists in TMF server", nil)
+		return
+	}
+
 	// The first step is to save to the database the data provided by the user
+	// This is a draft registration, subject to some verifications
 
 	reg, err := saveToDB(requestData, s)
 	if err != nil {
 		err = errl.Errorf("Failed to save registration: %w", err)
 		slog.Error("❌ Error saving registration", "error", err)
-		s.SendJSON(w, http.StatusInternalServerError, false, "Error saving to database", err.Error())
+		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error saving to database", err.Error())
+		return
 	}
 
 	// Once the data is saved, we continue with the registration process, but we will always return to
@@ -285,30 +305,12 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get an access token to authenticate in the Issuer and TM Forum APIs
-	token, err := s.Issuer.GetAccessToken()
-	if err != nil {
-		err = errl.Errorf("Failed to get access token for credential issuance: %v", err)
-		slog.Error("❌ Error getting access token", "error", err)
-		// Record the error in the database
-		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
-			RegistrationID: reg.RegistrationID,
-			Email:          reg.Email,
-			VatID:          reg.VatID,
-			Error:          fmt.Sprintf("Access token error: %v", err),
-		})
-		// Log the error but return a success to the user
-		slog.Error("❌ Error getting access token", "error", err)
-		s.SendJSON(w, http.StatusOK, true, "Registration successful", nil)
-		return
-	}
-
 	// Perform the verifiable credential issuance
 	err = performIssuance(token, reg, s, requestData)
 	if err != nil {
 		slog.Error("❌ Error performing issuance", "error", err)
 		// Log the error but return a success to the user
-		s.SendJSON(w, http.StatusOK, true, "Registration successful", nil)
+		s.SendJSON(w, r, http.StatusOK, true, "Registration successful", nil)
 		return
 	}
 
@@ -324,7 +326,7 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	s.SendJSON(w, http.StatusOK, true, "Registration successful", nil)
+	s.SendJSON(w, r, http.StatusOK, true, "Registration successful", nil)
 }
 
 func performIssuance(token string, reg *db.RegistrationRecord, s *Server, requestData RegistrationRequest) error {

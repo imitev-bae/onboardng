@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"net"
 	"net/http"
 	"sync"
@@ -43,13 +44,20 @@ func NewServer(dbService *db.Service, issuer *credissuance.LEARIssuance, mailSer
 	mux.Handle("/", fileServer)
 
 	// API Routes
-	mux.HandleFunc("/api/validate-email", s.EnableCORS(s.RateLimitIP(s.HandleValidateEmail)))
-	mux.HandleFunc("/api/verify-code", s.EnableCORS(s.HandleVerifyCode))
-	mux.HandleFunc("/api/register", s.EnableCORS(s.HandleRegister))
+	mux.HandleFunc("/api/validate-email", s.LogRequest(s.EnableCORS(s.RateLimitIP(s.HandleValidateEmail))))
+	mux.HandleFunc("/api/verify-code", s.LogRequest(s.EnableCORS(s.HandleVerifyCode)))
+	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
 	mux.HandleFunc("/health", s.HandleHealth)
 
 	s.Handler = mux
 	return s
+}
+
+func (s *Server) LogRequest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("Entry", "method", r.Method, "url", r.URL.Path)
+		next(w, r)
+	}
 }
 
 func (s *Server) getIPLimiter(ip string) *rate.Limiter {
@@ -75,7 +83,7 @@ func (s *Server) RateLimitIP(next http.HandlerFunc) http.HandlerFunc {
 
 		limiter := s.getIPLimiter(ip)
 		if !limiter.Allow() {
-			s.SendJSON(w, http.StatusTooManyRequests, false, "Too many requests", nil)
+			s.SendJSON(w, r, http.StatusTooManyRequests, false, "Too many requests", nil)
 			return
 		}
 

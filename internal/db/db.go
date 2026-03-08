@@ -99,6 +99,8 @@ func (s *Service) Close() error {
 	return s.conn.Close()
 }
 
+var ErrorAlreadyExists = errors.New("already exists")
+
 func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 	insertQuery := `
 	INSERT INTO registrations (
@@ -138,10 +140,10 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 
 		// Otherwise, if either exists, it's a conflict since they don't belong to the same record
 		if oldRegVat != nil {
-			return errl.Errorf("company with VAT ID %s already registered with a different email", reg.VatID)
+			return errl.Errorf("%w: company with VAT ID %s already registered with a different email", ErrorAlreadyExists, reg.VatID)
 		}
 		if oldRegEmail != nil {
-			return errl.Errorf("user with email %s already registered with a different VAT ID", reg.Email)
+			return errl.Errorf("%w: user with email %s already registered with a different VAT ID", ErrorAlreadyExists, reg.Email)
 		}
 
 		// No conflicts, insert as new
@@ -161,12 +163,13 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 
 		// In production, we reject if either the company (vat_id) or the individual (email) already exists.
 		if oldRegVat != nil {
-			return errl.Errorf("company with VAT ID %s already registered", reg.VatID)
+			return errl.Errorf("%w: company with VAT ID %s already registered", ErrorAlreadyExists, reg.VatID)
 		}
 		if oldRegEmail != nil {
-			return errl.Errorf("email %s already registered", reg.Email)
+			return errl.Errorf("%w: email %s already registered", ErrorAlreadyExists, reg.Email)
 		}
 
+		// No conflicts, insert as new
 		_, err = s.conn.Exec(insertQuery,
 			reg.RegistrationID, reg.Email, reg.FirstName, reg.LastName, reg.CompanyName, reg.Country, reg.VatID,
 			reg.StreetAddress, reg.PostalCode,

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"filippo.io/age"
 	"github.com/hesusruiz/onboardng/internal/configuration"
@@ -86,6 +87,7 @@ type LEARIssuance struct {
 	myDidkey               string
 	credentialIssuancePath string
 	tmForumURL             string
+	httpClient             *http.Client
 }
 
 func (l *LEARIssuance) GetAccessToken() (string, error) {
@@ -224,6 +226,11 @@ func NewLEARIssuance(config configuration.EnvConfig) (*LEARIssuance, error) {
 
 	// Store the TM Forum Base URL, stripping the trailing slash if present
 	l.tmForumURL = strings.TrimSuffix(config.TMForum.BaseURL, "/")
+
+	// Create a HTTP Client with a timeout
+	l.httpClient = &http.Client{
+		Timeout: 10 * time.Second,
+	}
 
 	return l, nil
 

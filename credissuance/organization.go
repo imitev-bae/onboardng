@@ -3,6 +3,7 @@ package credissuance
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/hesusruiz/utils/errl"
 )
+
+const partyPathPrefix = "/tmf-api/party/v4"
 
 // Organization represents a group of people identified by shared interests or purpose.
 type Organization struct {
@@ -273,28 +276,15 @@ type OtherNameOrganization struct {
 	Type           string      `json:"@type,omitempty"`
 }
 
+var ErrorNotFound = errors.New("not found")
+
 // TMFListOrganizations lists or finds Organization objects.
 func (l *LEARIssuance) TMFListOrganizations(accessToken string, fields string, offset, limit int) ([]Organization, error) {
-	url := fmt.Sprintf("%s/tmf-api/party/v4/organization?fields=%s&offset=%d&limit=%d", l.tmForumURL, fields, offset, limit)
+	url := fmt.Sprintf("%s%s/organization?fields=%s&offset=%d&limit=%d", l.tmForumURL, partyPathPrefix, fields, offset, limit)
 
-	req, _ := http.NewRequest("GET", url, nil)
-	if accessToken != "" {
-		req.Header.Add("Authorization", "Bearer "+accessToken)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
+	orgs, err := doHTTPList(url, accessToken, l.httpClient)
 	if err != nil {
-		return nil, errl.Errorf("error calling TMFListOrganizations: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errl.Errorf("error calling TMFListOrganizations: %v", resp.Status)
-	}
-
-	var orgs []Organization
-	if err := json.NewDecoder(resp.Body).Decode(&orgs); err != nil {
-		return nil, errl.Errorf("error decoding TMFListOrganizations response: %w", err)
+		return nil, err
 	}
 
 	return orgs, nil
@@ -302,24 +292,57 @@ func (l *LEARIssuance) TMFListOrganizations(accessToken string, fields string, o
 
 // TMFGetOrganizationByELSI retrieves Organization objects by ELSI identifier.
 // If the error is nil, the returned array has at least one element. Otherwise, the array is empty.
-// The function accepts an ELSI identifier prefixed with "did:elsi:" or alone, so it has to perform two searches to the server,
+// The function accepts an ELSI identifier with or without "did:elsi:" prefix, and performs two searches to the server,
 // one with the prefix and the second without, to make sure that it finds the Organization in the server.
 func (l *LEARIssuance) TMFGetOrganizationByELSI(accessToken string, elsi string) ([]Organization, error) {
 
 	// Strip the prefix "did:elsi:" if it exists
 	elsi = strings.TrimPrefix(elsi, "did:elsi:")
 
-	// The url for searching without the prefix
-	url := fmt.Sprintf("%s/tmf-api/party/v4/organization?organizationIdentification.identificationId=%s", l.tmForumURL, elsi)
+	// First search with the prefix
+	url := fmt.Sprintf("%s%s/organization?organizationIdentification.identificationId=did:elsi:%s", l.tmForumURL, partyPathPrefix, elsi)
+
+	orgs, err := doHTTPList(url, accessToken, l.httpClient)
+	if err == nil && len(orgs) > 0 {
+		return orgs, nil
+	}
+
+	// If not found, try again without the prefix
+	url = fmt.Sprintf("%s%s/organization?organizationIdentification.identificationId=%s", l.tmForumURL, partyPathPrefix, elsi)
+
+	orgs, err = doHTTPList(url, accessToken, l.httpClient)
+	if err == nil && len(orgs) > 0 {
+		return orgs, nil
+	}
+
+	// And lastly, try the externalReference.name mechanism, as a legacy fallback
+	url = fmt.Sprintf("%s%s/organization?externalReference.name=%s", l.tmForumURL, partyPathPrefix, elsi)
+
+	orgs, err = doHTTPList(url, accessToken, l.httpClient)
+	if err == nil && len(orgs) > 0 {
+		return orgs, nil
+	}
+
+	return nil, errl.Errorf("no organization with ELSI %s: %w", elsi, ErrorNotFound)
+}
+
+// doHTTPList retrieves Organization objects from the TM Forum API.
+// If the error is nil, the returned array has at least one element. Otherwise, the array is empty.
+// The optional httpClient parameter can be used to provide a custom HTTP client. It can be nil.
+func doHTTPList(url string, accessToken string, httpClient *http.Client) ([]Organization, error) {
+
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
 
 	req, _ := http.NewRequest("GET", url, nil)
 	if accessToken != "" {
 		req.Header.Add("Authorization", "Bearer "+accessToken)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, errl.Errorf("error calling TMFGetOrganizationByELSI: %w", err)
+		return nil, errl.Errorf("error in http request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -327,12 +350,12 @@ func (l *LEARIssuance) TMFGetOrganizationByELSI(accessToken string, elsi string)
 	if resp.StatusCode == http.StatusOK {
 		var orgs []Organization
 		if err := json.NewDecoder(resp.Body).Decode(&orgs); err != nil {
-			return nil, errl.Errorf("error decoding TMFGetOrganizationByELSI response: %w", err)
+			return nil, errl.Errorf("error decoding response: %w", err)
 		}
 
 		// If no organization was found, return an error
 		if len(orgs) == 0 {
-			return nil, errl.Errorf("no organization found with ELSI: %s", elsi)
+			return nil, errl.Error(ErrorNotFound)
 		}
 
 		// It is OK to retrieve more than one organization with the same ELSI for this function.
@@ -340,37 +363,8 @@ func (l *LEARIssuance) TMFGetOrganizationByELSI(accessToken string, elsi string)
 		return orgs, nil
 	}
 
-	// If not found, try again with the prefix
-	url = fmt.Sprintf("%s/tmf-api/party/v4/organization?organizationIdentification.identificationId=did:elsi:%s", l.tmForumURL, elsi)
-
-	req, _ = http.NewRequest("GET", url, nil)
-	if accessToken != "" {
-		req.Header.Add("Authorization", "Bearer "+accessToken)
-	}
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, errl.Errorf("error calling TMFGetOrganizationByELSI: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errl.Errorf("error calling TMFGetOrganizationByELSI: %v", resp.Status)
-	}
-
-	var orgs []Organization
-	if err := json.NewDecoder(resp.Body).Decode(&orgs); err != nil {
-		return nil, errl.Errorf("error decoding TMFGetOrganizationByELSI response: %w", err)
-	}
-
-	// If no organization was found, return an error
-	if len(orgs) == 0 {
-		return nil, errl.Errorf("no organization found with ELSI: %s", elsi)
-	}
-
-	// It is OK to retrieve more than one organization with the same ELSI for this function.
-	// This is an error in the backend that will be solved in another way. The caller will decide what to do.
-	return orgs, nil
+	// If the organization was not found, return an error
+	return nil, errl.Error(ErrorNotFound)
 }
 
 type RegistrationRequest struct {
@@ -527,8 +521,6 @@ func TMFOrganizationFromRequest(requestData RegistrationRequest) *Organization_C
 
 	return &org
 }
-
-const partyPathPrefix = "/tmf-api/party/v4"
 
 // TMFCreateOrganization creates a Organization.
 func (l *LEARIssuance) TMFCreateOrganization(accessToken string, org *Organization_Create) (*Organization, error) {
