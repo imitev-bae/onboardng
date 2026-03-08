@@ -221,7 +221,9 @@ func NewLEARIssuance(config configuration.EnvConfig) (*LEARIssuance, error) {
 	l.verifierURL = config.Verifier.URL
 	l.myDidkey = config.MyDidkey
 	l.credentialIssuancePath = config.Issuer.CredentialIssuancePath
-	l.tmForumURL = config.TMForum.BaseURL
+
+	// Store the TM Forum Base URL, stripping the trailing slash if present
+	l.tmForumURL = strings.TrimSuffix(config.TMForum.BaseURL, "/")
 
 	return l, nil
 

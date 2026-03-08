@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/hesusruiz/utils/errl"
 )
@@ -272,9 +273,9 @@ type OtherNameOrganization struct {
 	Type           string      `json:"@type,omitempty"`
 }
 
-// ListOrganizations lists or finds Organization objects.
-func (l *LEARIssuance) ListOrganizations(accessToken string, fields string, offset, limit int) ([]Organization, error) {
-	url := fmt.Sprintf("%s/organization?fields=%s&offset=%d&limit=%d", l.tmForumURL, fields, offset, limit)
+// TMFListOrganizations lists or finds Organization objects.
+func (l *LEARIssuance) TMFListOrganizations(accessToken string, fields string, offset, limit int) ([]Organization, error) {
+	url := fmt.Sprintf("%s/tmf-api/party/v4/organization?fields=%s&offset=%d&limit=%d", l.tmForumURL, fields, offset, limit)
 
 	req, _ := http.NewRequest("GET", url, nil)
 	if accessToken != "" {
@@ -283,19 +284,92 @@ func (l *LEARIssuance) ListOrganizations(accessToken string, fields string, offs
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, errl.Errorf("error calling ListOrganizations: %w", err)
+		return nil, errl.Errorf("error calling TMFListOrganizations: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errl.Errorf("error calling ListOrganizations: %v", resp.Status)
+		return nil, errl.Errorf("error calling TMFListOrganizations: %v", resp.Status)
 	}
 
 	var orgs []Organization
 	if err := json.NewDecoder(resp.Body).Decode(&orgs); err != nil {
-		return nil, errl.Errorf("error decoding ListOrganizations response: %w", err)
+		return nil, errl.Errorf("error decoding TMFListOrganizations response: %w", err)
 	}
 
+	return orgs, nil
+}
+
+// TMFGetOrganizationByELSI retrieves Organization objects by ELSI identifier.
+// If the error is nil, the returned array has at least one element. Otherwise, the array is empty.
+// The function accepts an ELSI identifier prefixed with "did:elsi:" or alone, so it has to perform two searches to the server,
+// one with the prefix and the second without, to make sure that it finds the Organization in the server.
+func (l *LEARIssuance) TMFGetOrganizationByELSI(accessToken string, elsi string) ([]Organization, error) {
+
+	// Strip the prefix "did:elsi:" if it exists
+	elsi = strings.TrimPrefix(elsi, "did:elsi:")
+
+	// The url for searching without the prefix
+	url := fmt.Sprintf("%s/tmf-api/party/v4/organization?organizationIdentification.identificationId=%s", l.tmForumURL, elsi)
+
+	req, _ := http.NewRequest("GET", url, nil)
+	if accessToken != "" {
+		req.Header.Add("Authorization", "Bearer "+accessToken)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, errl.Errorf("error calling TMFGetOrganizationByELSI: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Return the organization(s) if it was found (StatusCode == StatusOK)
+	if resp.StatusCode == http.StatusOK {
+		var orgs []Organization
+		if err := json.NewDecoder(resp.Body).Decode(&orgs); err != nil {
+			return nil, errl.Errorf("error decoding TMFGetOrganizationByELSI response: %w", err)
+		}
+
+		// If no organization was found, return an error
+		if len(orgs) == 0 {
+			return nil, errl.Errorf("no organization found with ELSI: %s", elsi)
+		}
+
+		// It is OK to retrieve more than one organization with the same ELSI for this function.
+		// This is an error in the backend that will be solved in another way. The caller will decide what to do.
+		return orgs, nil
+	}
+
+	// If not found, try again with the prefix
+	url = fmt.Sprintf("%s/tmf-api/party/v4/organization?organizationIdentification.identificationId=did:elsi:%s", l.tmForumURL, elsi)
+
+	req, _ = http.NewRequest("GET", url, nil)
+	if accessToken != "" {
+		req.Header.Add("Authorization", "Bearer "+accessToken)
+	}
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, errl.Errorf("error calling TMFGetOrganizationByELSI: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errl.Errorf("error calling TMFGetOrganizationByELSI: %v", resp.Status)
+	}
+
+	var orgs []Organization
+	if err := json.NewDecoder(resp.Body).Decode(&orgs); err != nil {
+		return nil, errl.Errorf("error decoding TMFGetOrganizationByELSI response: %w", err)
+	}
+
+	// If no organization was found, return an error
+	if len(orgs) == 0 {
+		return nil, errl.Errorf("no organization found with ELSI: %s", elsi)
+	}
+
+	// It is OK to retrieve more than one organization with the same ELSI for this function.
+	// This is an error in the backend that will be solved in another way. The caller will decide what to do.
 	return orgs, nil
 }
 
@@ -313,7 +387,7 @@ type RegistrationRequest struct {
 
 var accessToken = "eyJraWQiOiJkaWQ6a2V5OnpEbmFldk44NVo3VkpnY0JvUWVxUVU3ZDhrWnB1VmhEU2RtOGhRdEpZV2p2ZWszVkwiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJodHRwczovL3ZlcmlmaWVyLmRvbWUtbWFya2V0cGxhY2Utc2J4Lm9yZyIsInN1YiI6ImRpZDprZXk6ekRuYWVhanczRm1NZ3NHSnhXZ2dNTGJYRmdyN3lvZVRCS0JzUEFkRXJiTHBTRkxadCIsInNjb3BlIjoibWFjaGluZSBsZWFyY3JlZGVudGlhbCIsImlzcyI6Imh0dHBzOi8vdmVyaWZpZXIuZG9tZS1tYXJrZXRwbGFjZS1zYngub3JnIiwiZXhwIjoxNzcyNzc4NjQ2LCJpYXQiOjE3NzI3NzUwNDYsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy9ucy9jcmVkZW50aWFscy92MiIsImh0dHBzOi8vY3JlZGVudGlhbHMuZXVkaXN0YWNrLmV1Ly53ZWxsLWtub3duL2NyZWRlbnRpYWxzL2xlYXJfY3JlZGVudGlhbF9tYWNoaW5lL3czYy92MiJdLCJjcmVkZW50aWFsU3RhdHVzIjp7ImlkIjoiaHR0cHM6Ly9pc3N1ZXIuZG9tZS1tYXJrZXRwbGFjZS1zYngub3JnL3czYy92MS9jcmVkZW50aWFscy9zdGF0dXMvMSM5NDMyMyIsInN0YXR1c0xpc3RDcmVkZW50aWFsIjoiaHR0cHM6Ly9pc3N1ZXIuZG9tZS1tYXJrZXRwbGFjZS1zYngub3JnL3czYy92MS9jcmVkZW50aWFscy9zdGF0dXMvMSIsInN0YXR1c0xpc3RJbmRleCI6Ijk0MzIzIiwic3RhdHVzUHVycG9zZSI6InJldm9jYXRpb24iLCJ0eXBlIjoiQml0c3RyaW5nU3RhdHVzTGlzdEVudHJ5In0sImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoiZGlkOmtleTp6RG5hZWFqdzNGbU1nc0dKeFdnZ01MYlhGZ3I3eW9lVEJLQnNQQWRFcmJMcFNGTFp0IiwibWFuZGF0ZSI6eyJtYW5kYXRlZSI6eyJkb21haW4iOiJ0bWYuc2J4LmV2aWRlbmNlbGVkZ2VyLmV1IiwiaWQiOiJkaWQ6a2V5OnpEbmFlYWp3M0ZtTWdzR0p4V2dnTUxiWEZncjd5b2VUQktCc1BBZEVyYkxwU0ZMWnQiLCJpcEFkZHJlc3MiOiIyMTIuMjI3LjYxLjIwNiJ9LCJtYW5kYXRvciI6eyJjb21tb25OYW1lIjoiQ29uc3RhbnRpbm8gRmVybsOhbmRleiIsImNvdW50cnkiOiJFUyIsImVtYWlsIjoiZXhhbXBsZUBleGFtcGxlLm9yZyIsImlkIjoiZGlkOmVsc2k6VkFURVMtQTE1NDU2NTg1Iiwib3JnYW5pemF0aW9uIjoiQUxUSUEgQ09OU1VMVE9SRVMgU0EiLCJvcmdhbml6YXRpb25JZGVudGlmaWVyIjoiVkFURVMtQTE1NDU2NTg1Iiwic2VyaWFsTnVtYmVyIjoiMzI3NzEzODVMIn0sInBvd2VyIjpbeyJhY3Rpb24iOlsiRXhlY3V0ZSJdLCJkb21haW4iOiJET01FIiwiZnVuY3Rpb24iOiJPbmJvYXJkaW5nIiwidHlwZSI6ImRvbWFpbiJ9XX19LCJpZCI6InVybjp1dWlkOjg5MzEzOWU0LTE2YjgtNGFjZS1hN2QzLWZjNWNhMjkyYWY3ZCIsImlzc3VlciI6eyJjb21tb25OYW1lIjoiU2VhbCBTaWduYXR1cmUgQ3JlZGVudGlhbHMgaW4gU0JYIGZvciB0ZXN0aW5nIiwiY291bnRyeSI6IkVTIiwiaWQiOiJkaWQ6ZWxzaTpWQVRFUy1CNjA2NDU5MDAiLCJvcmdhbml6YXRpb24iOiJJTjIiLCJvcmdhbml6YXRpb25JZGVudGlmaWVyIjoiVkFURVMtQjYwNjQ1OTAwIiwic2VyaWFsTnVtYmVyIjoiQjQ3NDQ3NTYwIn0sInR5cGUiOlsiTEVBUkNyZWRlbnRpYWxNYWNoaW5lIiwiVmVyaWZpYWJsZUNyZWRlbnRpYWwiXSwidmFsaWRGcm9tIjoiMjAyNi0wMi0yMFQxMzowNjo1My4yMDMzMzQ3NDNaIiwidmFsaWRVbnRpbCI6IjIwMjctMDItMjBUMTM6MDY6NTMuMjAzMzM0NzQzWiJ9LCJqdGkiOiJjMWM1ZTVjZS04YzE2LTRmMzMtYTdkYy05NTQ3YjZkNTI1NTEiLCJjbGllbnRfaWQiOiJodHRwczovL3ZlcmlmaWVyLmRvbWUtbWFya2V0cGxhY2Utc2J4Lm9yZyJ9.AmlnDNComKFujzyuqwXCE_JkpE7r0gGsO-3pCtp3CNK2tcRcFYPkyzej8DR9LCpGtoDg8fytDkVOjwqn0QwNBw"
 
-func MyOrganization() (*Organization, error) {
+func MyTMFOrganization() (*Organization, error) {
 
 	org := Organization_Create{}
 	org.Type = "organization"
@@ -398,7 +472,7 @@ func MyOrganization() (*Organization, error) {
 
 }
 
-func OrganizationFromRequest(requestData RegistrationRequest) *Organization_Create {
+func TMFOrganizationFromRequest(requestData RegistrationRequest) *Organization_Create {
 	org := Organization_Create{}
 	org.Type = "organization"
 	org.Name = requestData.CompanyName
@@ -454,16 +528,16 @@ func OrganizationFromRequest(requestData RegistrationRequest) *Organization_Crea
 	return &org
 }
 
-const pathPrefix = "/tmf-api/party/v4"
+const partyPathPrefix = "/tmf-api/party/v4"
 
-// CreateOrganization creates a Organization.
-func (l *LEARIssuance) CreateOrganization(accessToken string, org *Organization_Create) (*Organization, error) {
+// TMFCreateOrganization creates a Organization.
+func (l *LEARIssuance) TMFCreateOrganization(accessToken string, org *Organization_Create) (*Organization, error) {
 	buf, err := json.Marshal(org)
 	if err != nil {
 		return nil, errl.Errorf("error marshalling request body: %w", err)
 	}
 
-	url := fmt.Sprintf("%s%s/organization", l.tmForumURL, pathPrefix)
+	url := fmt.Sprintf("%s%s/organization", l.tmForumURL, partyPathPrefix)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(buf))
 	req.Header.Add("Content-Type", "application/json")
 	if accessToken != "" {
@@ -491,9 +565,9 @@ func (l *LEARIssuance) CreateOrganization(accessToken string, org *Organization_
 	return &createdOrg, nil
 }
 
-// RetrieveOrganization retrieves a Organization by ID.
-func (l *LEARIssuance) RetrieveOrganization(accessToken string, id string, fields string) (*Organization, error) {
-	url := fmt.Sprintf("%s%s/organization/%s?fields=%s", l.tmForumURL, pathPrefix, id, fields)
+// TMFRetrieveOrganization retrieves a Organization by ID.
+func (l *LEARIssuance) TMFRetrieveOrganization(accessToken string, id string, fields string) (*Organization, error) {
+	url := fmt.Sprintf("%s%s/organization/%s?fields=%s", l.tmForumURL, partyPathPrefix, id, fields)
 	req, _ := http.NewRequest("GET", url, nil)
 	if accessToken != "" {
 		req.Header.Add("Authorization", "Bearer "+accessToken)
@@ -517,14 +591,14 @@ func (l *LEARIssuance) RetrieveOrganization(accessToken string, id string, field
 	return &org, nil
 }
 
-// PatchOrganization partially updates a Organization.
-func (l *LEARIssuance) PatchOrganization(accessToken string, id string, org *Organization_Update) (*Organization, error) {
+// TMFPatchOrganization partially updates a Organization.
+func (l *LEARIssuance) TMFPatchOrganization(accessToken string, id string, org *Organization_Update) (*Organization, error) {
 	buf, err := json.Marshal(org)
 	if err != nil {
 		return nil, errl.Errorf("error marshalling request body: %w", err)
 	}
 
-	url := fmt.Sprintf("%s%s/organization/%s", l.tmForumURL, pathPrefix, id)
+	url := fmt.Sprintf("%s%s/organization/%s", l.tmForumURL, partyPathPrefix, id)
 	req, _ := http.NewRequest("PATCH", url, bytes.NewBuffer(buf))
 	req.Header.Add("Content-Type", "application/json")
 	if accessToken != "" {
@@ -549,9 +623,9 @@ func (l *LEARIssuance) PatchOrganization(accessToken string, id string, org *Org
 	return &updatedOrg, nil
 }
 
-// DeleteOrganization deletes a Organization.
-func (l *LEARIssuance) DeleteOrganization(accessToken string, id string) error {
-	url := fmt.Sprintf("%s%s/organization/%s", l.tmForumURL, pathPrefix, id)
+// TMFDeleteOrganization deletes a Organization.
+func (l *LEARIssuance) TMFDeleteOrganization(accessToken string, id string) error {
+	url := fmt.Sprintf("%s%s/organization/%s", l.tmForumURL, partyPathPrefix, id)
 	req, _ := http.NewRequest("DELETE", url, nil)
 	if accessToken != "" {
 		req.Header.Add("Authorization", "Bearer "+accessToken)
