@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hesusruiz/onboardng/common"
 	"github.com/hesusruiz/onboardng/credissuance"
+	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
 	"github.com/hesusruiz/utils/errl"
 )
@@ -262,31 +264,50 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check in the TMF server if the organization already exists
+	// Check in the TMF server if the organization already exists.
+	// In PRO, we reject registration if the organization already exists.
+	// In other environments, we continue with the registration, deleting the existing orgs.
 	existingOrgs, _ := s.Issuer.TMFGetOrganizationByELSI(token, requestData.VatId)
 	if len(existingOrgs) > 0 {
 		slog.Info("Organization already exists in TMF server", "vatId", requestData.VatId)
-		s.SendJSON(w, r, http.StatusConflict, false, "Organization already exists in TMF server", nil)
-		return
+
+		switch s.Runtime {
+
+		case configuration.Production:
+			s.SendJSON(w, r, http.StatusConflict, false, "Organization already exists in TMF server", nil)
+			return
+
+		case configuration.Development, configuration.Preproduction:
+			slog.Info("Deleting all organizations found and continuing", "environment", s.Runtime)
+			// Delete all the organizations from the TMF server
+			for _, org := range existingOrgs {
+				if err := s.Issuer.TMFDeleteOrganization(token, org.ID); err != nil {
+					err = errl.Errorf("Failed to delete organization for registration: %v", err)
+					slog.Error("❌ Error deleting organization", "error", err)
+				}
+				slog.Info("Existing organization deleted from TM Forum server", "orgId", org.ID)
+			}
+
+		}
 	}
 
 	// The first step is to save to the database the data provided by the user
 	// This is a draft registration, subject to some verifications
-
 	reg, err := saveToDB(requestData, s)
 	if err != nil {
+		// For any other error, registration stops with failure
 		err = errl.Errorf("Failed to save registration: %w", err)
 		slog.Error("❌ Error saving registration", "error", err)
 		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error saving to database", err.Error())
 		return
 	}
 
-	// Once the data is saved, we continue with the registration process, but we will always return to
-	// the user with a success and a welcome message, so they know the process is in motion.
+	// Once the data is saved, we continue with the registration process.
+	// Even if we faind erros, we always return to the user with a success and a welcome message,
+	// so they know the process is in motion.
 	// The rest of the remaining steps, if any, will be performed manually by the internal team.
 
 	// Send a welcome email to the user, with copy to the relevant onboarding team, so they can followup on the onboarding process
-
 	if err := s.Mail.SendWelcomeEmail(reg); err != nil {
 		err = errl.Errorf("Failed to send welcome email: %w", err)
 		slog.Error("❌ Error sending welcome email", "error", err)
@@ -309,9 +330,6 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	err = performIssuance(token, reg, s, requestData)
 	if err != nil {
 		slog.Error("❌ Error performing issuance", "error", err)
-		// Log the error but return a success to the user
-		s.SendJSON(w, r, http.StatusOK, true, "Registration successful", nil)
-		return
 	}
 
 	err = updateTMForum(token, requestData, reg, s)
@@ -329,8 +347,35 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	s.SendJSON(w, r, http.StatusOK, true, "Registration successful", nil)
 }
 
+func saveToDB(requestData RegistrationRequest, s *Server) (*db.RegistrationRecord, error) {
+	regID := generateRegistrationID()
+	reg := &db.RegistrationRecord{
+		RegistrationID: regID,
+		Email:          requestData.Email,
+		FirstName:      requestData.FirstName,
+		LastName:       requestData.LastName,
+		CompanyName:    requestData.CompanyName,
+		Country:        requestData.Country,
+		VatID:          requestData.VatId,
+		StreetAddress:  requestData.StreetAddress,
+		PostalCode:     requestData.PostalCode,
+	}
+
+	// Create an initial registration in the database, updated with error and status later
+	if err := s.DB.SaveRegistration(reg); err != nil {
+		if errors.Is(err, db.ErrorAlreadyExists) {
+			slog.Error("Registration conflict", "error", err)
+		} else {
+			slog.Error("❌ Error saving initial registration", "error", err)
+		}
+		return nil, err
+	}
+	return reg, nil
+}
+
 func performIssuance(token string, reg *db.RegistrationRecord, s *Server, requestData RegistrationRequest) error {
 
+	// Create the struct needed by the Issuer API
 	cred := &credissuance.LEARIssuanceRequestBody{
 		Schema:        "LEARCredentialEmployee",
 		OperationMode: "S",
@@ -396,62 +441,8 @@ func performIssuance(token string, reg *db.RegistrationRecord, s *Server, reques
 	return nil
 }
 
-func saveToDB(requestData RegistrationRequest, s *Server) (*db.RegistrationRecord, error) {
-	regID := generateRegistrationID()
-	reg := &db.RegistrationRecord{
-		RegistrationID: regID,
-		Email:          requestData.Email,
-		FirstName:      requestData.FirstName,
-		LastName:       requestData.LastName,
-		CompanyName:    requestData.CompanyName,
-		Country:        requestData.Country,
-		VatID:          requestData.VatId,
-		StreetAddress:  requestData.StreetAddress,
-		PostalCode:     requestData.PostalCode,
-	}
-
-	// Create an initial registration in the database, updated with error and status later
-	if err := s.DB.SaveRegistration(reg); err != nil {
-		slog.Error("❌ Error saving initial registration", "error", err)
-		return nil, err
-	}
-	return reg, nil
-}
-
 func updateTMForum(token string, requestData RegistrationRequest, reg *db.RegistrationRecord, s *Server) error {
 
-	// The next step is to register the organization in the TM Forum server, if it does not exist yet.
-	// If it does, we first delete all possible existing instances and the we create a new one.
-
-	// Delete any existing instance of the organization in the TM Forum server
-	// This is done by checking if the organization with the same ELSI already exists
-	// In this context the ELSI without prefix is the vat_id
-	existingOrgs, _ := s.Issuer.TMFGetOrganizationByELSI(token, requestData.VatId)
-	if len(existingOrgs) > 0 {
-		if len(existingOrgs) > 1 {
-			slog.Error("Multiple organizations found with the same ELSI", "vatId", requestData.VatId)
-		} else {
-			slog.Info("Organization already exists in TM Forum server", "vatId", requestData.VatId, "orgId", existingOrgs[0].ID)
-		}
-
-		// Delete all the organizations from the TMF server
-		for _, org := range existingOrgs {
-			if err := s.Issuer.TMFDeleteOrganization(token, org.ID); err != nil {
-				err = errl.Errorf("Failed to delete organization for registration: %v", err)
-				slog.Error("❌ Error deleting organization", "error", err)
-				// Record the error in the database
-				_ = s.DB.SaveRegistrationError(&db.RegistrationError{
-					RegistrationID: reg.RegistrationID,
-					Email:          reg.Email,
-					VatID:          reg.VatID,
-					Error:          fmt.Sprintf("TM Forum delete organization error: %v", err),
-				})
-			}
-			slog.Info("Existing organization deleted from TM Forum server", "orgId", org.ID)
-		}
-	}
-
-	// Now we can create the object in the TM Forum server
 	orgForm := credissuance.RegistrationRequest{
 		CompanyName:   requestData.CompanyName,
 		FirstName:     requestData.FirstName,

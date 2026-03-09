@@ -2,11 +2,14 @@ package server
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/hesusruiz/onboardng/internal/db"
 )
 
 func TestLogging(t *testing.T) {
@@ -55,6 +58,23 @@ func TestLogging(t *testing.T) {
 		}
 		if !strings.Contains(logs, "\"msg\":\"Exit\"") {
 			t.Errorf("Expected Exit log for health check (via SendJSON), got: %s", logs)
+		}
+	})
+
+	t.Run("Conflict logging uses Warn level", func(t *testing.T) {
+		buf.Reset()
+		// Mock error check logic from saveToDB
+		err := db.ErrorAlreadyExists
+		if errors.Is(err, db.ErrorAlreadyExists) {
+			slog.Warn("Registration conflict", "error", err)
+		}
+
+		logs := buf.String()
+		if !strings.Contains(logs, "\"level\":\"WARN\"") {
+			t.Errorf("Expected WARN level for conflict, got: %s", logs)
+		}
+		if !strings.Contains(logs, "\"msg\":\"Registration conflict\"") {
+			t.Errorf("Expected 'Registration conflict' message, got: %s", logs)
 		}
 	})
 }

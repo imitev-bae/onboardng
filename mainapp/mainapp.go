@@ -92,7 +92,15 @@ func Run() error {
 			slog.Info("🔐 AGE_SECRET_KEY captured and removed from environment")
 		}
 
-		cfg := loadEncryptedConfig(*runCfgPath, secretKey)
+		// Read secret key from file if not already set by env var
+		if secretKey == "" {
+			// Try reading from config/age_secret_key.txt
+			if data, err := os.ReadFile("config/age_secret_key.txt"); err == nil {
+				secretKey = strings.TrimSpace(string(data))
+			}
+		}
+
+		cfg := LoadEncryptedConfig(*runCfgPath, secretKey)
 		return run(cfg, *envFlag, *port, *watchFlag, secretKey)
 
 	case "generate":
@@ -105,7 +113,15 @@ func Run() error {
 			os.Unsetenv("AGE_SECRET_KEY")
 		}
 
-		cfg := loadEncryptedConfig(*runCfgPath, secretKey)
+		// Read secret key from file if not already set by env var
+		if secretKey == "" {
+			// Try reading from config/age_secret_key.txt
+			if data, err := os.ReadFile("config/age_secret_key.txt"); err == nil {
+				secretKey = strings.TrimSpace(string(data))
+			}
+		}
+
+		cfg := LoadEncryptedConfig(*runCfgPath, secretKey)
 		return generate(cfg)
 
 	case "seal":
@@ -159,14 +175,11 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 
 	// Setup issuer
 	issuerCfg := configuration.EnvConfig{
-		Runtime:               runtimeEnv,
-		AgeSecretKey:          srvConfig.AgeSecretKey,
-		Debug:                 srvConfig.Debug,
-		PrivateKeyFile:        srvConfig.PrivateKeyFile,
-		PrivateKey:            srvConfig.PrivateKey,
-		MachineCredentialFile: srvConfig.MachineCredentialFile,
-		MachineCredential:     srvConfig.MachineCredential,
-		MyDidkey:              srvConfig.MyDidkey,
+		Runtime:           runtimeEnv,
+		Debug:             srvConfig.Debug,
+		PrivateKey:        srvConfig.PrivateKey,
+		MachineCredential: srvConfig.MachineCredential,
+		MyDidkey:          srvConfig.MyDidkey,
 		Verifier: configuration.VerifierConfig{
 			URL:           srvConfig.Verifier.URL,
 			TokenEndpoint: srvConfig.Verifier.TokenEndpoint,
@@ -207,7 +220,7 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 
 	dbService.RunMaintenance(context.Background())
 
-	srv := server.NewServer(dbService, issuanceService, mailService, cfg.DestDir)
+	srv := server.NewServer(runtimeEnv, dbService, issuanceService, mailService, cfg.DestDir)
 
 	// Start Watcher if requested
 	if watchFlag {
@@ -225,7 +238,7 @@ func run(cfg configuration.Config, envFlag string, port string, watchFlag bool, 
 	return nil
 }
 
-func loadEncryptedConfig(path string, secretKey string) configuration.Config {
+func LoadEncryptedConfig(path string, secretKey string) configuration.Config {
 	var source io.ReadCloser
 
 	// Handle both remote and local files
@@ -294,7 +307,60 @@ func loadEncryptedConfig(path string, secretKey string) configuration.Config {
 	}
 	fmt.Println(string(jsonConfig))
 
+	// 4. Prepare each environment: decrypt or read internal credentials
+	for name, env := range cfg.Environments {
+		env.AgeSecretKey = secretKey
+
+		// Prepare Private Key
+		priv, err := decryptInternalCredential(env.PrivateKey, env.PrivateKeyFile, secretKey)
+		if err != nil {
+			log.Fatalf("Error preparing private key for environment %s: %v", name, err)
+		}
+		env.PrivateKey = priv
+
+		// Prepare Machine Credential
+		machine, err := decryptInternalCredential(env.MachineCredential, env.MachineCredentialFile, secretKey)
+		if err != nil {
+			log.Fatalf("Error preparing machine credential for environment %s: %v", name, err)
+		}
+		env.MachineCredential = machine
+
+		cfg.Environments[name] = env
+	}
+
 	return cfg
+}
+
+// decryptInternalCredential handles the logic of either decrypting an embedded credential or reading it from a file.
+func decryptInternalCredential(encryptedData, filePath, secretKey string) (string, error) {
+	if encryptedData != "" {
+		if secretKey == "" {
+			return "", errl.Errorf("secret key is missing but required for decryption")
+		}
+		identity, err := age.ParseHybridIdentity(secretKey)
+		if err != nil {
+			return "", errl.Errorf("invalid identity key: %w", err)
+		}
+		ageReader, err := age.Decrypt(strings.NewReader(encryptedData), identity)
+		if err != nil {
+			return "", errl.Errorf("failed to decrypt: %w", err)
+		}
+		buf, err := io.ReadAll(ageReader)
+		if err != nil {
+			return "", errl.Errorf("error reading decrypted data: %w", err)
+		}
+		return string(buf), nil
+	}
+
+	if filePath != "" {
+		buf, err := os.ReadFile(filePath)
+		if err != nil {
+			return "", errl.Errorf("error reading from file %s: %w", filePath, err)
+		}
+		return string(buf), nil
+	}
+
+	return "", nil
 }
 
 // sealConfig encrypts a plain config file using age encryption

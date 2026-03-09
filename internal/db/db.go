@@ -107,7 +107,11 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
 		street_address, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	) VALUES (
+		:registration_id, :email, :first_name, :last_name, :company_name, :country, :vat_id,
+		:street_address, :postal_code,
+		:created_at, :updated_at, :notified, :issued, :tmf_registered
+	)`
 
 	now := time.Now()
 	reg.CreatedAt = now
@@ -119,20 +123,53 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 	// Check if a registration with the same VAT ID already exists
 	oldRegVat, err := s.GetRegistrationByVatID(reg.VatID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return errl.Errorf("failed to check VAT ID: %w", err)
+		return errl.Errorf("failed to search for VAT ID: %w", err)
 	}
 
 	// Check if a registration with the same email already exists
 	oldRegEmail, err := s.GetRegistrationByEmail(reg.Email)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return errl.Errorf("failed to check email: %w", err)
+		return errl.Errorf("failed to search for email: %w", err)
 	}
 
 	switch s.runtime {
+
+	case configuration.Production:
+
+		// In production, we reject if either the company (vat_id) or the individual (email) already exists.
+		if oldRegVat != nil {
+			return errl.Errorf("%w: company with VAT ID %s already registered", ErrorAlreadyExists, reg.VatID)
+		}
+		if oldRegEmail != nil {
+			return errl.Errorf("%w: email %s already registered", ErrorAlreadyExists, reg.Email)
+		}
+
+		// No conflicts, insert as new
+		_, err = s.conn.Exec(insertQuery,
+			sql.Named("registration_id", reg.RegistrationID),
+			sql.Named("email", reg.Email),
+			sql.Named("first_name", reg.FirstName),
+			sql.Named("last_name", reg.LastName),
+			sql.Named("company_name", reg.CompanyName),
+			sql.Named("country", reg.Country),
+			sql.Named("vat_id", reg.VatID),
+			sql.Named("street_address", reg.StreetAddress),
+			sql.Named("postal_code", reg.PostalCode),
+			sql.Named("created_at", reg.CreatedAt),
+			sql.Named("updated_at", reg.UpdatedAt),
+			sql.Named("notified", reg.Notified),
+			sql.Named("issued", reg.Issued),
+			sql.Named("tmf_registered", reg.TMFRegistered),
+		)
+		if err != nil {
+			return errl.Errorf("failed to insert registration: %w", err)
+		}
+		return nil
+
 	case configuration.Development, configuration.Preproduction:
 		// In Dev/Pre, if BOTH email and VAT ID match an existing record, we overwrite it (amend)
 		if oldRegVat != nil && oldRegEmail != nil && oldRegVat.RegistrationID == oldRegEmail.RegistrationID {
-			slog.Info("Registration exists with same email and VAT ID, amending", "vat_id", reg.VatID, "email", reg.Email)
+			slog.Info("Registration exists with same email and VAT ID, amending", "environment", s.runtime, "vat_id", reg.VatID, "email", reg.Email)
 			// Reuse the existing registration ID
 			reg.RegistrationID = oldRegVat.RegistrationID
 			return s.AmendRegistration(reg)
@@ -147,56 +184,51 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 		}
 
 		// No conflicts, insert as new
-		slog.Info("Saving new registration in development or preproduction", "vat_id", reg.VatID, "email", reg.Email)
 		_, err := s.conn.Exec(insertQuery,
-			reg.RegistrationID, reg.Email, reg.FirstName, reg.LastName, reg.CompanyName, reg.Country, reg.VatID,
-			reg.StreetAddress, reg.PostalCode,
-			reg.CreatedAt, reg.UpdatedAt, reg.Notified, reg.Issued, reg.TMFRegistered,
+			sql.Named("registration_id", reg.RegistrationID),
+			sql.Named("email", reg.Email),
+			sql.Named("first_name", reg.FirstName),
+			sql.Named("last_name", reg.LastName),
+			sql.Named("company_name", reg.CompanyName),
+			sql.Named("country", reg.Country),
+			sql.Named("vat_id", reg.VatID),
+			sql.Named("street_address", reg.StreetAddress),
+			sql.Named("postal_code", reg.PostalCode),
+			sql.Named("created_at", reg.CreatedAt),
+			sql.Named("updated_at", reg.UpdatedAt),
+			sql.Named("notified", reg.Notified),
+			sql.Named("issued", reg.Issued),
+			sql.Named("tmf_registered", reg.TMFRegistered),
 		)
 		if err != nil {
 			return errl.Errorf("failed to insert registration: %w", err)
 		}
 		return nil
 
-	case configuration.Production:
-		slog.Info("Saving registration in production", "vat_id", reg.VatID, "email", reg.Email)
-
-		// In production, we reject if either the company (vat_id) or the individual (email) already exists.
-		if oldRegVat != nil {
-			return errl.Errorf("%w: company with VAT ID %s already registered", ErrorAlreadyExists, reg.VatID)
-		}
-		if oldRegEmail != nil {
-			return errl.Errorf("%w: email %s already registered", ErrorAlreadyExists, reg.Email)
-		}
-
-		// No conflicts, insert as new
-		_, err = s.conn.Exec(insertQuery,
-			reg.RegistrationID, reg.Email, reg.FirstName, reg.LastName, reg.CompanyName, reg.Country, reg.VatID,
-			reg.StreetAddress, reg.PostalCode,
-			reg.CreatedAt, reg.UpdatedAt, reg.Notified, reg.Issued, reg.TMFRegistered,
-		)
-		if err != nil {
-			return errl.Errorf("failed to insert registration: %w", err)
-		}
-		return nil
 	}
 
 	// Should never happen, return an error
 	return fmt.Errorf("unknown runtime environment: %s", s.runtime)
 }
 
+// UpdateRegistrationStatus updates the status flags of a registration.
+// Other fields are not updated, except the timestamp of the update.
 func (s *Service) UpdateRegistrationStatus(reg *RegistrationRecord) error {
 	reg.UpdatedAt = time.Now()
 	query := `
 	UPDATE registrations SET
-		updated_at = ?,
-		notified = ?,
-		issued = ?,
-		tmf_registered = ?
-	WHERE registration_id = ? AND email = ?`
+		updated_at = :updated_at,
+		notified = :notified,
+		issued = :issued,
+		tmf_registered = :tmf_registered
+	WHERE registration_id = :registration_id AND email = :email`
 	_, err := s.conn.Exec(query,
-		reg.UpdatedAt, reg.Notified, reg.Issued, reg.TMFRegistered,
-		reg.RegistrationID, reg.Email,
+		sql.Named("updated_at", reg.UpdatedAt),
+		sql.Named("notified", reg.Notified),
+		sql.Named("issued", reg.Issued),
+		sql.Named("tmf_registered", reg.TMFRegistered),
+		sql.Named("registration_id", reg.RegistrationID),
+		sql.Named("email", reg.Email),
 	)
 	if err != nil {
 		return errl.Errorf("failed to update registration: %w", err)
@@ -204,31 +236,34 @@ func (s *Service) UpdateRegistrationStatus(reg *RegistrationRecord) error {
 	return nil
 }
 
+// AmendRegistration updates all fields of an existing registration, except the vat_id, email and registration_id.
 func (s *Service) AmendRegistration(reg *RegistrationRecord) error {
 	reg.UpdatedAt = time.Now()
 	query := `
 	UPDATE registrations SET
-		registration_id = ?,
-		first_name = ?,
-		last_name = ?,
-		company_name = ?,
-		country = ?,
-		street_address = ?,
-		postal_code = ?,
-		updated_at = ?,
-		notified = ?,
-		issued = ?,
-		tmf_registered = ?,
-		email = ?
-	WHERE vat_id = ?`
+		first_name = :first_name,
+		last_name = :last_name,
+		company_name = :company_name,
+		country = :country,
+		street_address = :street_address,
+		postal_code = :postal_code,
+		updated_at = :updated_at,
+		notified = :notified,
+		issued = :issued,
+		tmf_registered = :tmf_registered
+	WHERE vat_id = :vat_id`
 	_, err := s.conn.Exec(query,
-		reg.RegistrationID,
-		reg.FirstName, reg.LastName, reg.CompanyName, reg.Country,
-		reg.StreetAddress, reg.PostalCode,
-		reg.UpdatedAt,
-		reg.Notified, reg.Issued, reg.TMFRegistered,
-		reg.Email,
-		reg.VatID,
+		sql.Named("first_name", reg.FirstName),
+		sql.Named("last_name", reg.LastName),
+		sql.Named("company_name", reg.CompanyName),
+		sql.Named("country", reg.Country),
+		sql.Named("street_address", reg.StreetAddress),
+		sql.Named("postal_code", reg.PostalCode),
+		sql.Named("updated_at", reg.UpdatedAt),
+		sql.Named("notified", reg.Notified),
+		sql.Named("issued", reg.Issued),
+		sql.Named("tmf_registered", reg.TMFRegistered),
+		sql.Named("vat_id", reg.VatID),
 	)
 	if err != nil {
 		return errl.Errorf("failed to amend registration: %w", err)
@@ -244,9 +279,12 @@ func (s *Service) GetRegistrations(limit, offset int) ([]RegistrationRecord, err
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
 	ORDER BY created_at DESC
-	LIMIT ? OFFSET ?`
+	LIMIT :limit OFFSET :offset`
 
-	rows, err := s.conn.Query(query, limit, offset)
+	rows, err := s.conn.Query(query,
+		sql.Named("limit", limit),
+		sql.Named("offset", offset),
+	)
 	if err != nil {
 		return nil, errl.Errorf("failed to get registrations: %w", err)
 	}
@@ -280,10 +318,13 @@ func (s *Service) GetRegistration(vatID string, email string) (*RegistrationReco
 		street_address, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
-	WHERE vat_id = ? AND email = ?`
+	WHERE vat_id = :vat_id AND email = :email`
 
 	var reg RegistrationRecord
-	err := s.conn.QueryRow(query, vatID, email).Scan(
+	err := s.conn.QueryRow(query,
+		sql.Named("vat_id", vatID),
+		sql.Named("email", email),
+	).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
 		&reg.StreetAddress, &reg.PostalCode,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
@@ -301,10 +342,10 @@ func (s *Service) GetRegistrationByVatID(vatID string) (*RegistrationRecord, err
 		street_address, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
-	WHERE vat_id = ?`
+	WHERE vat_id = :vat_id`
 
 	var reg RegistrationRecord
-	err := s.conn.QueryRow(query, vatID).Scan(
+	err := s.conn.QueryRow(query, sql.Named("vat_id", vatID)).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
 		&reg.StreetAddress, &reg.PostalCode,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
@@ -322,10 +363,10 @@ func (s *Service) GetRegistrationByEmail(email string) (*RegistrationRecord, err
 		street_address, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
-	WHERE email = ?`
+	WHERE email = :email`
 
 	var reg RegistrationRecord
-	err := s.conn.QueryRow(query, email).Scan(
+	err := s.conn.QueryRow(query, sql.Named("email", email)).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
 		&reg.StreetAddress, &reg.PostalCode,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
@@ -340,12 +381,16 @@ func (s *Service) SaveRegistrationError(regErr *RegistrationError) error {
 	query := `
 	INSERT INTO registration_errors (
 		registration_id, email, vat_id, error, created_at
-	) VALUES (?, ?, ?, ?, ?)`
+	) VALUES (:registration_id, :email, :vat_id, :error, :created_at)`
 
 	regErr.CreatedAt = time.Now()
 
 	_, err := s.conn.Exec(query,
-		regErr.RegistrationID, regErr.Email, regErr.VatID, regErr.Error, regErr.CreatedAt,
+		sql.Named("registration_id", regErr.RegistrationID),
+		sql.Named("email", regErr.Email),
+		sql.Named("vat_id", regErr.VatID),
+		sql.Named("error", regErr.Error),
+		sql.Named("created_at", regErr.CreatedAt),
 	)
 	if err != nil {
 		return errl.Errorf("failed to insert registration error: %w", err)

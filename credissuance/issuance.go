@@ -8,13 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"filippo.io/age"
 	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/utils/errl"
 	"github.com/mr-tron/base58/base58"
@@ -103,36 +100,10 @@ func (l *LEARIssuance) GetAccessToken() (string, error) {
 func NewLEARIssuance(config configuration.EnvConfig) (*LEARIssuance, error) {
 
 	// Read the private key
-	var pemBytesRaw []byte
-	if config.PrivateKey != "" {
-		// Try to decrypt the embedded key
-		if config.AgeSecretKey == "" {
-			return nil, errl.Errorf("AgeSecretKey is missing but required for embedded private key")
-		}
-
-		identity, err := age.ParseHybridIdentity(config.AgeSecretKey)
-		if err != nil {
-			return nil, errl.Errorf("invalid identity key: %w", err)
-		}
-
-		ageReader, err := age.Decrypt(strings.NewReader(config.PrivateKey), identity)
-		if err != nil {
-			return nil, errl.Errorf("failed to decrypt embedded private key: %w", err)
-		}
-
-		pemBytesRaw, err = io.ReadAll(ageReader)
-		if err != nil {
-			return nil, errl.Errorf("error reading decrypted private key: %w", err)
-		}
-	} else {
-		slog.Warn("private key not encrypted in config file, reading from file")
-		// Read the private key from file
-		var err error
-		pemBytesRaw, err = os.ReadFile(config.PrivateKeyFile)
-		if err != nil {
-			return nil, errl.Errorf("error reading private key from file: %w", err)
-		}
+	if config.PrivateKey == "" {
+		return nil, errl.Errorf("private key is missing in configuration")
 	}
+	pemBytesRaw := []byte(config.PrivateKey)
 
 	// Strip any '0x' or '0X' prefix from the key and decode it
 	hexKey := strings.TrimPrefix(string(pemBytesRaw), "0x")
@@ -183,36 +154,10 @@ func NewLEARIssuance(config configuration.EnvConfig) (*LEARIssuance, error) {
 	}
 
 	// Read the LEARCredentialMachine
-	var machineCredential string
-	if config.MachineCredential != "" {
-		// Try to decrypt the embedded machine credential
-		if config.AgeSecretKey == "" {
-			return nil, errl.Errorf("AgeSecretKey is missing but required for embedded machine credential")
-		}
-
-		identity, err := age.ParseHybridIdentity(config.AgeSecretKey)
-		if err != nil {
-			return nil, errl.Errorf("invalid identity key: %w", err)
-		}
-
-		ageReader, err := age.Decrypt(strings.NewReader(config.MachineCredential), identity)
-		if err != nil {
-			return nil, errl.Errorf("failed to decrypt embedded machine credential: %w", err)
-		}
-
-		buf, err := io.ReadAll(ageReader)
-		if err != nil {
-			return nil, errl.Errorf("error reading decrypted machine credential: %w", err)
-		}
-		machineCredential = string(buf)
-	} else {
-		slog.Warn("machine credential not encrypted in config file, reading from file")
-		buf, err := os.ReadFile(config.MachineCredentialFile)
-		if err != nil {
-			return nil, errl.Errorf("error reading machine credential from file: %w", err)
-		}
-		machineCredential = string(buf)
+	if config.MachineCredential == "" {
+		return nil, errl.Errorf("machine credential is missing in configuration")
 	}
+	machineCredential := config.MachineCredential
 
 	l := &LEARIssuance{
 		privateKey:        privateKey,

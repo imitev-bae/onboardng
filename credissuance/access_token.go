@@ -103,7 +103,7 @@ func NewCliAssertion(learCredential string, didkey string, verifierURL string, p
 
 	// Set the claims with timestamps
 	now := time.Now()
-	claims.ExpiresAt = jwt.NewNumericDate(now.Add(24 * 30 * time.Hour))
+	claims.ExpiresAt = jwt.NewNumericDate(now.Add(1 * time.Hour))
 	claims.IssuedAt = jwt.NewNumericDate(now)
 	claims.NotBefore = jwt.NewNumericDate(now)
 
@@ -175,7 +175,7 @@ func NewVPToken(vcStringToken string, didkey string, privateKey *ecdsa.PrivateKe
 
 	// Set the claims with timestamps
 	now := time.Now()
-	claims.ExpiresAt = jwt.NewNumericDate(now.Add(24 * 30 * time.Hour))
+	claims.ExpiresAt = jwt.NewNumericDate(now.Add(1 * time.Hour))
 	claims.IssuedAt = jwt.NewNumericDate(now)
 	claims.NotBefore = jwt.NewNumericDate(now)
 

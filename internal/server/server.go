@@ -9,11 +9,13 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/hesusruiz/onboardng/credissuance"
+	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
 	"github.com/hesusruiz/onboardng/internal/mail"
 )
 
 type Server struct {
+	Runtime           configuration.RuntimeEnv
 	DB                *db.Service
 	Issuer            *credissuance.LEARIssuance
 	Mail              *mail.Service
@@ -26,8 +28,9 @@ type Server struct {
 	Handler           http.Handler
 }
 
-func NewServer(dbService *db.Service, issuer *credissuance.LEARIssuance, mailService *mail.Service, staticFilesDir string) *Server {
+func NewServer(runtime configuration.RuntimeEnv, dbService *db.Service, issuer *credissuance.LEARIssuance, mailService *mail.Service, staticFilesDir string) *Server {
 	s := &Server{
+		Runtime:           runtime,
 		DB:                dbService,
 		Issuer:            issuer,
 		Mail:              mailService,
