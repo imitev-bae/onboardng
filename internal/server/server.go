@@ -11,14 +11,35 @@ import (
 	"github.com/hesusruiz/onboardng/credissuance"
 	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
-	"github.com/hesusruiz/onboardng/internal/mail"
 )
+
+type DBServiceProvider interface {
+	SaveRegistration(reg *db.RegistrationRecord) error
+	UpdateRegistrationStatus(reg *db.RegistrationRecord) error
+	SaveRegistrationError(regErr *db.RegistrationError) error
+	GetRegistrationByVatID(vatID string) (*db.RegistrationRecord, error)
+	GetRegistrationByEmail(email string) (*db.RegistrationRecord, error)
+}
+
+type MailServiceProvider interface {
+	SendVerificationCode(email string, code string) error
+	SendWelcomeEmail(reg *db.RegistrationRecord) error
+	SendIssuerError(reg *db.RegistrationRecord, payload string, errorMsg string) error
+}
+
+type IssuanceServiceProvider interface {
+	GetAccessToken() (string, error)
+	TMFGetOrganizationByELSI(accessToken string, elsi string) ([]credissuance.Organization, error)
+	TMFDeleteOrganization(accessToken string, id string) error
+	LEARIssuanceRequest(accessToken string, learCredData *credissuance.LEARIssuanceRequestBody) ([]byte, error)
+	TMFCreateOrganization(accessToken string, org *credissuance.Organization_Create) (*credissuance.Organization, error)
+}
 
 type Server struct {
 	Runtime           configuration.RuntimeEnv
-	DB                *db.Service
-	Issuer            *credissuance.LEARIssuance
-	Mail              *mail.Service
+	DB                DBServiceProvider
+	Issuer            IssuanceServiceProvider
+	Mail              MailServiceProvider
 	EmailRateLimiter  map[string]*RateLimitEntry
 	VerificationCodes map[string]*VerificationCodeEntry
 	RateLimiterMu     sync.RWMutex
@@ -28,7 +49,7 @@ type Server struct {
 	Handler           http.Handler
 }
 
-func NewServer(runtime configuration.RuntimeEnv, dbService *db.Service, issuer *credissuance.LEARIssuance, mailService *mail.Service, staticFilesDir string) *Server {
+func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, issuer IssuanceServiceProvider, mailService MailServiceProvider, staticFilesDir string) *Server {
 	s := &Server{
 		Runtime:           runtime,
 		DB:                dbService,
