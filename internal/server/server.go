@@ -73,6 +73,11 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
 	mux.HandleFunc("/health", s.HandleHealth)
 
+	// Redirect /register-customer to /
+	mux.HandleFunc("/register-customer", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+	})
+
 	s.Handler = mux
 	return s
 }

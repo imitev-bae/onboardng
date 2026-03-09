@@ -307,3 +307,13 @@ func TestHandleHealth(t *testing.T) {
 	s.HandleHealth(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
+
+func TestRegisterCustomerRedirect(t *testing.T) {
+	s := NewServer(configuration.Development, &MockDB{}, &MockIssuance{}, &MockMail{}, "/tmp")
+	req := httptest.NewRequest(http.MethodGet, "/register-customer", nil)
+	w := httptest.NewRecorder()
+	s.Handler.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusMovedPermanently, w.Code)
+	assert.Equal(t, "/", w.Header().Get("Location"))
+}
