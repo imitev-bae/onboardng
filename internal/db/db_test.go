@@ -193,3 +193,82 @@ func TestRegistrationStatusFields(t *testing.T) {
 			updatedReg.Notified, updatedReg.Issued, updatedReg.TMFRegistered)
 	}
 }
+
+func TestRegistrationFiles(t *testing.T) {
+	dbPath := "data/onboarding_files_test.db"
+	os.Remove(dbPath) // Start fresh
+	defer os.Remove(dbPath)
+
+	svc, err := NewService(configuration.Development, dbPath)
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+	defer svc.Close()
+
+	file1 := &RegistrationFile{
+		FileID:         "file-001",
+		RegistrationID: "reg-file-001",
+		VatID:          "VAT_FILE_1",
+		Name:           "document1.pdf",
+		MimeType:       "application/pdf",
+		Size:           1024 * 1024,
+	}
+
+	file2 := &RegistrationFile{
+		FileID:         "file-002",
+		RegistrationID: "reg-file-001",
+		VatID:          "VAT_FILE_1",
+		Name:           "document2.pdf",
+		MimeType:       "application/pdf",
+		Size:           2048 * 1024,
+	}
+
+	// 1. Save files
+	if err := svc.SaveRegistrationFile(file1); err != nil {
+		t.Fatalf("failed to save registration file 1: %v", err)
+	}
+	if err := svc.SaveRegistrationFile(file2); err != nil {
+		t.Fatalf("failed to save registration file 2: %v", err)
+	}
+
+	// 2. Get files by VatID
+	files, err := svc.GetRegistrationFilesByVatID("VAT_FILE_1")
+	if err != nil {
+		t.Fatalf("failed to get registration files: %v", err)
+	}
+	if len(files) != 2 {
+		t.Errorf("expected 2 files, got %d", len(files))
+	}
+	if files[0].Status != "uploaded" {
+		t.Errorf("expected default status 'uploaded', got %s", files[0].Status)
+	}
+
+	// 3. Update file status
+	if err := svc.UpdateRegistrationFileStatus("file-001", "verified"); err != nil {
+		t.Fatalf("failed to update registration file status: %v", err)
+	}
+
+	filesUpdated, err := svc.GetRegistrationFilesByVatID("VAT_FILE_1")
+	if err != nil {
+		t.Fatalf("failed to get updated registration files: %v", err)
+	}
+
+	for _, f := range filesUpdated {
+		if f.FileID == "file-001" && f.Status != "verified" {
+			t.Errorf("expected file-001 to be 'verified', got %s", f.Status)
+		}
+	}
+
+	// 4. Delete file
+	if err := svc.DeleteRegistrationFile("file-002"); err != nil {
+		t.Fatalf("failed to delete registration file: %v", err)
+	}
+
+	filesDeleted, err := svc.GetRegistrationFilesByVatID("VAT_FILE_1")
+	if err != nil {
+		t.Fatalf("failed to get registration files after deletion: %v", err)
+	}
+	if len(filesDeleted) != 1 {
+		t.Errorf("expected 1 file remaining after deletion, got %d", len(filesDeleted))
+	}
+}

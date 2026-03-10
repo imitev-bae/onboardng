@@ -19,6 +19,9 @@ type DBServiceProvider interface {
 	SaveRegistrationError(regErr *db.RegistrationError) error
 	GetRegistrationByVatID(vatID string) (*db.RegistrationRecord, error)
 	GetRegistrationByEmail(email string) (*db.RegistrationRecord, error)
+	GetRegistrations(limit, offset int) ([]db.RegistrationRecord, error)
+	GetRegistrationErrors(limit, offset int) ([]db.RegistrationError, error)
+	GetRegistrationFiles(limit, offset int) ([]db.RegistrationFile, error)
 }
 
 type MailServiceProvider interface {
@@ -67,11 +70,19 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	fileServer := http.FileServer(http.Dir("dist/browser"))
 	mux.Handle("/", fileServer)
 
+	// Admin dashboard static files
+	adminFileServer := http.FileServer(http.Dir("docs/admin"))
+	mux.Handle("/admin/", http.StripPrefix("/admin/", adminFileServer))
+
 	// API Routes
 	mux.HandleFunc("/api/validate-email", s.LogRequest(s.EnableCORS(s.RateLimitIP(s.HandleValidateEmail))))
 	mux.HandleFunc("/api/verify-code", s.LogRequest(s.EnableCORS(s.HandleVerifyCode)))
 	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
 	mux.HandleFunc("/health", s.HandleHealth)
+
+	mux.HandleFunc("/api/admin/registrations", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrations)))
+	mux.HandleFunc("/api/admin/registration-errors", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationErrors)))
+	mux.HandleFunc("/api/admin/registration-files", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationFiles)))
 
 	// Redirect /register-customer to /
 	mux.HandleFunc("/register-customer", func(w http.ResponseWriter, r *http.Request) {

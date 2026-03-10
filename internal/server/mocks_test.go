@@ -11,6 +11,9 @@ type MockDB struct {
 	SaveRegistrationErrorFunc    func(regErr *db.RegistrationError) error
 	GetRegistrationByVatIDFunc   func(vatID string) (*db.RegistrationRecord, error)
 	GetRegistrationByEmailFunc   func(email string) (*db.RegistrationRecord, error)
+	GetRegistrationsFunc         func(limit, offset int) ([]db.RegistrationRecord, error)
+	GetRegistrationErrorsFunc    func(limit, offset int) ([]db.RegistrationError, error)
+	GetRegistrationFilesFunc     func(limit, offset int) ([]db.RegistrationFile, error)
 }
 
 func (m *MockDB) SaveRegistration(reg *db.RegistrationRecord) error {
@@ -27,6 +30,15 @@ func (m *MockDB) GetRegistrationByVatID(vatID string) (*db.RegistrationRecord, e
 }
 func (m *MockDB) GetRegistrationByEmail(email string) (*db.RegistrationRecord, error) {
 	return m.GetRegistrationByEmailFunc(email)
+}
+func (m *MockDB) GetRegistrations(limit, offset int) ([]db.RegistrationRecord, error) {
+	return m.GetRegistrationsFunc(limit, offset)
+}
+func (m *MockDB) GetRegistrationErrors(limit, offset int) ([]db.RegistrationError, error) {
+	return m.GetRegistrationErrorsFunc(limit, offset)
+}
+func (m *MockDB) GetRegistrationFiles(limit, offset int) ([]db.RegistrationFile, error) {
+	return m.GetRegistrationFilesFunc(limit, offset)
 }
 
 type MockMail struct {
