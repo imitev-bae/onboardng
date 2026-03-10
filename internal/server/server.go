@@ -65,7 +65,23 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	// Static file serving
 	// fileServer := http.FileServer(http.Dir(staticFilesDir))
 	fileServer := http.FileServer(http.Dir("dist/browser"))
-	mux.Handle("/", fileServer)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Only intercept exactly "/"
+		if r.URL.Path == "/" {
+			page := r.URL.Query().Get("page")
+			switch page {
+			case "buyer":
+				http.Redirect(w, r, "/register-customer", http.StatusMovedPermanently)
+				return
+			case "seller":
+				http.Redirect(w, r, "/register-provider", http.StatusMovedPermanently)
+				return
+			}
+		}
+
+		// Otherwise serve static files
+		fileServer.ServeHTTP(w, r)
+	})
 
 	// API Routes
 	mux.HandleFunc("/api/validate-email", s.LogRequest(s.EnableCORS(s.RateLimitIP(s.HandleValidateEmail))))
