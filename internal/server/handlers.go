@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hesusruiz/onboardng/common"
 	"github.com/hesusruiz/onboardng/credissuance"
+	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
 	"github.com/hesusruiz/utils/errl"
 )
@@ -38,7 +40,8 @@ type RegistrationRequest struct {
 }
 
 // SendJSON utility helper
-func (s *Server) SendJSON(w http.ResponseWriter, status int, success bool, message string, data any) {
+func (s *Server) SendJSON(w http.ResponseWriter, r *http.Request, status int, success bool, message string, data any) {
+	slog.Info("Exit", "method", r.Method, "url", r.URL.Path, "status", status)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(APIResponse{
@@ -94,7 +97,7 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !validateCSRF(r) {
-		s.SendJSON(w, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
+		s.SendJSON(w, r, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
 		return
 	}
 
@@ -102,18 +105,18 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid request body", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid request body", nil)
 		return
 	}
 
 	if req.Email == "" || !isValidEmail(req.Email) {
-		s.SendJSON(w, http.StatusBadRequest, false, "A valid email is required", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "A valid email is required", nil)
 		return
 	}
 
 	// Rate limiting
 	if !s.RegisterEmailAttempt(req.Email) {
-		s.SendJSON(w, http.StatusTooManyRequests, false, "Too many requests. Please wait a few minutes.", nil)
+		s.SendJSON(w, r, http.StatusTooManyRequests, false, "Too many requests. Please wait a few minutes.", nil)
 		return
 	}
 
@@ -128,7 +131,7 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	s.SendJSON(w, http.StatusOK, true, "Validation code sent to your email", map[string]string{"code": code})
+	s.SendJSON(w, r, http.StatusOK, true, "Validation code sent to your email", map[string]string{"code": code})
 }
 
 func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +141,7 @@ func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !validateCSRF(r) {
-		s.SendJSON(w, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
+		s.SendJSON(w, r, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
 		return
 	}
 
@@ -147,16 +150,16 @@ func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		Code  string `json:"code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid request body", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid request body", nil)
 		return
 	}
 
 	if !s.VerifyCode(req.Email, req.Code) {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid verification code", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid verification code", nil)
 		return
 	}
 
-	s.SendJSON(w, http.StatusOK, true, "Email verified successfully", nil)
+	s.SendJSON(w, r, http.StatusOK, true, "Email verified successfully", nil)
 }
 
 // HandleHealth returns a simple 200 OK response for health checks
@@ -165,7 +168,7 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	s.SendJSON(w, http.StatusOK, true, "OK", nil)
+	s.SendJSON(w, r, http.StatusOK, true, "OK", nil)
 }
 
 func (s *RegistrationRequest) Validate() error {
@@ -208,42 +211,171 @@ func (s *RegistrationRequest) Validate() error {
 // HandleRegister handles the registration process
 // It validates the request data, generates a registration ID, and sends an email to the user
 func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
+
+	// Perform all validations on input data
+	//
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	if !validateCSRF(r) {
-		s.SendJSON(w, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
+		s.SendJSON(w, r, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
 		return
 	}
 
 	var requestData RegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid request body", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid request body", nil)
 		return
 	}
 
 	if requestData.Website != "" {
 		slog.Info("🤖 Bot detected via honeypot field")
-		s.SendJSON(w, http.StatusOK, true, "Registration successful", nil)
+		s.SendJSON(w, r, http.StatusOK, true, "Registration successful", nil)
 		return
 	}
 
 	if err := requestData.Validate(); err != nil {
-		s.SendJSON(w, http.StatusBadRequest, false, err.Error(), nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, err.Error(), nil)
 		return
 	}
 
 	// Verify the code again to prevent spurious calls
 	if !s.VerifyCode(requestData.Email, requestData.Code) {
-		s.SendJSON(w, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
 		return
 	}
 	s.DeleteVerificationCode(requestData.Email)
 
 	slog.Info("Attempting to issue credential for registration", "email", requestData.Email, "vatID", requestData.VatId)
 
+	//
+	// Perform the registration
+	//
+
+	// Get an access token to authenticate in the Issuer and TM Forum APIs
+	token, err := s.Issuer.GetAccessToken()
+	if err != nil {
+		err = errl.Errorf("Failed to get access token for credential issuance: %v", err)
+		slog.Error("❌ Error getting access token", "error", err)
+		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error getting access token", err.Error())
+		return
+	}
+
+	// Check in the TMF server if the organization already exists.
+	// In PRO, we reject registration if the organization already exists.
+	// In other environments, we continue with the registration, deleting the existing orgs.
+	existingOrgs, _ := s.Issuer.TMFGetOrganizationByELSI(token, requestData.VatId)
+	if len(existingOrgs) > 0 {
+		slog.Info("Organization already exists in TMF server", "vatId", requestData.VatId)
+
+		switch s.Runtime {
+
+		case configuration.Production:
+			s.SendJSON(w, r, http.StatusConflict, false, "Organization already exists in TMF server", nil)
+			return
+
+		case configuration.Development, configuration.Preproduction:
+			slog.Info("Deleting all organizations found and continuing", "environment", s.Runtime)
+			// Delete all the organizations from the TMF server
+			for _, org := range existingOrgs {
+				if err := s.Issuer.TMFDeleteOrganization(token, org.ID); err != nil {
+					err = errl.Errorf("Failed to delete organization for registration: %v", err)
+					slog.Error("❌ Error deleting organization", "error", err)
+				}
+				slog.Info("Existing organization deleted from TM Forum server", "orgId", org.ID)
+			}
+
+		}
+	}
+
+	// The first step is to save to the database the data provided by the user
+	// This is a draft registration, subject to some verifications
+	reg, err := saveToDB(requestData, s)
+	if err != nil {
+		// For any other error, registration stops with failure
+		err = errl.Errorf("Failed to save registration: %w", err)
+		slog.Error("❌ Error saving registration", "error", err)
+		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error saving to database", err.Error())
+		return
+	}
+
+	// Once the data is saved, we continue with the registration process.
+	// Even if we faind erros, we always return to the user with a success and a welcome message,
+	// so they know the process is in motion.
+	// The rest of the remaining steps, if any, will be performed manually by the internal team.
+
+	// Send a welcome email to the user, with copy to the relevant onboarding team, so they can followup on the onboarding process
+	if err := s.Mail.SendWelcomeEmail(reg); err != nil {
+		err = errl.Errorf("Failed to send welcome email: %w", err)
+		slog.Error("❌ Error sending welcome email", "error", err)
+		// Record the error in the database
+		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
+			RegistrationID: reg.RegistrationID,
+			Email:          reg.Email,
+			VatID:          reg.VatID,
+			Error:          fmt.Sprintf("Welcome email error: %v", err.Error()),
+		})
+	} else {
+		slog.Info("📧 Welcome email sent", "email", reg.Email)
+		reg.Notified = true
+		if updateErr := s.DB.UpdateRegistrationStatus(reg); updateErr != nil {
+			slog.Error("❌ Error updating registration status with email result", "error", updateErr)
+		}
+	}
+
+	// Perform the verifiable credential issuance
+	err = performIssuance(token, reg, s, requestData)
+	if err != nil {
+		slog.Error("❌ Error performing issuance", "error", err)
+	}
+
+	err = updateTMForum(token, requestData, reg, s)
+	if err != nil {
+		slog.Error("❌ Error updating TM Forum", "error", err)
+		// Record the error in the database
+		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
+			RegistrationID: reg.RegistrationID,
+			Email:          reg.Email,
+			VatID:          reg.VatID,
+			Error:          fmt.Sprintf("TM Forum update error: %v", err),
+		})
+	}
+
+	s.SendJSON(w, r, http.StatusOK, true, "Registration successful", nil)
+}
+
+func saveToDB(requestData RegistrationRequest, s *Server) (*db.RegistrationRecord, error) {
+	regID := generateRegistrationID()
+	reg := &db.RegistrationRecord{
+		RegistrationID: regID,
+		Email:          requestData.Email,
+		FirstName:      requestData.FirstName,
+		LastName:       requestData.LastName,
+		CompanyName:    requestData.CompanyName,
+		Country:        requestData.Country,
+		VatID:          requestData.VatId,
+		StreetAddress:  requestData.StreetAddress,
+		PostalCode:     requestData.PostalCode,
+	}
+
+	// Create an initial registration in the database, updated with error and status later
+	if err := s.DB.SaveRegistration(reg); err != nil {
+		if errors.Is(err, db.ErrorAlreadyExists) {
+			slog.Error("Registration conflict", "error", err)
+		} else {
+			slog.Error("❌ Error saving initial registration", "error", err)
+		}
+		return nil, err
+	}
+	return reg, nil
+}
+
+func performIssuance(token string, reg *db.RegistrationRecord, s *Server, requestData RegistrationRequest) error {
+
+	// Create the struct needed by the Issuer API
 	cred := &credissuance.LEARIssuanceRequestBody{
 		Schema:        "LEARCredentialEmployee",
 		OperationMode: "S",
@@ -273,100 +405,44 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	regID := generateRegistrationID()
-	reg := &db.RegistrationRecord{
-		RegistrationID: regID,
-		Email:          requestData.Email,
-		FirstName:      requestData.FirstName,
-		LastName:       requestData.LastName,
-		CompanyName:    requestData.CompanyName,
-		Country:        requestData.Country,
-		VatID:          requestData.VatId,
-		StreetAddress:  requestData.StreetAddress,
-		PostalCode:     requestData.PostalCode,
-	}
+	if _, err := s.Issuer.LEARIssuanceRequest(token, cred); err != nil {
+		slog.Error("❌ Error calling issuance service", "error", err)
 
-	// Create an initial registration in the database, updated with error and status later
-	if err := s.DB.SaveRegistration(reg); err != nil {
-		slog.Error("❌ Error saving initial registration", "error", err)
-		s.SendJSON(w, http.StatusInternalServerError, false, "Failed to save registration", err.Error())
-		return
-	}
-
-	reg.IssuanceAt = time.Now()
-	token, err := s.Issuer.GetAccessToken()
-	if err != nil {
-		err = errl.Errorf("Failed to get access token for credential issuance: %v", err)
-		slog.Error("❌ Error getting access token", "error", err)
-		reg.IssuanceError = err.Error()
-		if updateErr := s.DB.UpdateRegistrationStatus(reg); updateErr != nil {
-			slog.Error("❌ Error updating registration status with access token error", "error", updateErr)
-		}
-		s.SendJSON(w, http.StatusInternalServerError, false, "Failed to get access token for credential issuance", err.Error())
-		return
-
-	}
-
-	_, issError := s.Issuer.LEARIssuanceRequest(token, cred)
-	if issError != nil {
-		// There was an error, update the register and send an email informing of the error
-
-		slog.Error("❌ Error calling issuance service", "error", issError)
-		reg.IssuanceError = issError.Error()
-		if updateErr := s.DB.UpdateRegistrationStatus(reg); updateErr != nil {
-			slog.Error("❌ Error updating registration status with issuance error", "error", updateErr)
-		}
+		// Record the error in the database
+		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
+			RegistrationID: reg.RegistrationID,
+			Email:          reg.Email,
+			VatID:          reg.VatID,
+			Error:          fmt.Sprintf("Issuance error (in performIssuance): %v", err),
+		})
 
 		// Format the information we sent to the Issuer
-		buf, err := json.MarshalIndent(cred, "", "  ")
-		if err != nil {
-			slog.Error("❌ Error marshalling credential data", "error", err)
+		buf, errformat := json.MarshalIndent(cred, "", "  ")
+		if errformat != nil {
+			slog.Error("❌ Error marshalling credential data", "error", errformat)
+			buf = []byte("Error marshalling credential data")
 		}
 
-		// Send an email informing of the error, including the information that we wanted to issue
-		err = s.Mail.SendIssuerError(reg, string(buf), reg.IssuanceError)
-		if err != nil {
+		// Send an email to the internal team informing of the error, including the information that we wanted to issue
+		// They can perform the rest of the registration steps manually, transparently to the user.
+
+		if err := s.Mail.SendIssuerError(reg, string(buf), err.Error()); err != nil {
 			slog.Error("❌ Error sending issuer error email", "error", err)
 		}
 
-		// Send a welcome email to the user, as if no error happened
-		err = s.Mail.SendWelcomeEmail(reg)
-		if err != nil {
-			slog.Error("❌ Error sending welcome email", "error", err)
-			reg.NotifEmailError = err.Error()
-		} else {
-			slog.Info("📧 Welcome email sent", "email", reg.Email)
-			reg.NotifEmailAt = time.Now()
-			reg.NotifEmailError = ""
-		}
-		if updateErr := s.DB.UpdateRegistrationStatus(reg); updateErr != nil {
-			slog.Error("❌ Error updating registration status with email result", "error", updateErr)
-		}
-
-		s.SendJSON(w, http.StatusOK, true, "Registration successful", nil)
-		return
+		return err
 	}
 
-	// Issuance correct, update the register and send an email informing of the success
-	reg.IssuanceError = ""
+	// If the credential issuance was ok, update the database and send an email informing of the success
+	reg.Issued = true
 	if err := s.DB.UpdateRegistrationStatus(reg); err != nil {
 		slog.Error("❌ Error updating registration status with issuance success", "error", err)
 	}
+	return nil
+}
 
-	err = s.Mail.SendWelcomeEmail(reg)
-	if err != nil {
-		slog.Error("❌ Error sending welcome email", "error", err)
-		reg.NotifEmailError = err.Error()
-	} else {
-		slog.Info("📧 Welcome email sent", "email", reg.Email)
-		reg.NotifEmailAt = time.Now()
-		reg.NotifEmailError = ""
-	}
-	if updateErr := s.DB.UpdateRegistrationStatus(reg); updateErr != nil {
-		slog.Error("❌ Error updating registration status with email result", "error", updateErr)
-	}
+func updateTMForum(token string, requestData RegistrationRequest, reg *db.RegistrationRecord, s *Server) error {
 
-	// Create the object in the TM Forum server
 	orgForm := credissuance.RegistrationRequest{
 		CompanyName:   requestData.CompanyName,
 		FirstName:     requestData.FirstName,
@@ -377,19 +453,24 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		StreetAddress: requestData.StreetAddress,
 		PostalCode:    requestData.PostalCode,
 	}
-	newOrg := credissuance.OrganizationFromRequest(orgForm)
+	newOrg := credissuance.TMFOrganizationFromRequest(orgForm)
 
-	_, err = s.Issuer.CreateOrganization(token, newOrg)
+	_, err := s.Issuer.TMFCreateOrganization(token, newOrg)
 	if err != nil {
 		err = errl.Errorf("Failed to create organization for registration: %v", err)
 		slog.Error("❌ Error creating organization", "error", err)
-		reg.IssuanceError = err.Error()
-		if updateErr := s.DB.UpdateRegistrationStatus(reg); updateErr != nil {
-			slog.Error("❌ Error updating registration status with organization creation error", "error", updateErr)
-		}
-		s.SendJSON(w, http.StatusInternalServerError, false, "Failed to create organization for registration", err.Error())
-		return
+		// Record the error in the database
+		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
+			RegistrationID: reg.RegistrationID,
+			Email:          reg.Email,
+			VatID:          reg.VatID,
+			Error:          fmt.Sprintf("TM Forum create organization error: %v", err),
+		})
+		return err
 	}
-
-	s.SendJSON(w, http.StatusOK, true, "Registration successful", nil)
+	reg.TMFRegistered = true
+	if err := s.DB.UpdateRegistrationStatus(reg); err != nil {
+		slog.Error("❌ Error updating registration status with TMF success", "error", err)
+	}
+	return nil
 }

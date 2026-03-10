@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"net"
 	"net/http"
 	"sync"
@@ -8,14 +9,37 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/hesusruiz/onboardng/credissuance"
+	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
-	"github.com/hesusruiz/onboardng/internal/mail"
 )
 
+type DBServiceProvider interface {
+	SaveRegistration(reg *db.RegistrationRecord) error
+	UpdateRegistrationStatus(reg *db.RegistrationRecord) error
+	SaveRegistrationError(regErr *db.RegistrationError) error
+	GetRegistrationByVatID(vatID string) (*db.RegistrationRecord, error)
+	GetRegistrationByEmail(email string) (*db.RegistrationRecord, error)
+}
+
+type MailServiceProvider interface {
+	SendVerificationCode(email string, code string) error
+	SendWelcomeEmail(reg *db.RegistrationRecord) error
+	SendIssuerError(reg *db.RegistrationRecord, payload string, errorMsg string) error
+}
+
+type IssuanceServiceProvider interface {
+	GetAccessToken() (string, error)
+	TMFGetOrganizationByELSI(accessToken string, elsi string) ([]credissuance.Organization, error)
+	TMFDeleteOrganization(accessToken string, id string) error
+	LEARIssuanceRequest(accessToken string, learCredData *credissuance.LEARIssuanceRequestBody) ([]byte, error)
+	TMFCreateOrganization(accessToken string, org *credissuance.Organization_Create) (*credissuance.Organization, error)
+}
+
 type Server struct {
-	DB                *db.Service
-	Issuer            *credissuance.LEARIssuance
-	Mail              *mail.Service
+	Runtime           configuration.RuntimeEnv
+	DB                DBServiceProvider
+	Issuer            IssuanceServiceProvider
+	Mail              MailServiceProvider
 	EmailRateLimiter  map[string]*RateLimitEntry
 	VerificationCodes map[string]*VerificationCodeEntry
 	RateLimiterMu     sync.RWMutex
@@ -25,8 +49,9 @@ type Server struct {
 	Handler           http.Handler
 }
 
-func NewServer(dbService *db.Service, issuer *credissuance.LEARIssuance, mailService *mail.Service, staticFilesDir string) *Server {
+func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, issuer IssuanceServiceProvider, mailService MailServiceProvider, staticFilesDir string) *Server {
 	s := &Server{
+		Runtime:           runtime,
 		DB:                dbService,
 		Issuer:            issuer,
 		Mail:              mailService,
@@ -38,17 +63,30 @@ func NewServer(dbService *db.Service, issuer *credissuance.LEARIssuance, mailSer
 	mux := http.NewServeMux()
 
 	// Static file serving
-	fileServer := http.FileServer(http.Dir(staticFilesDir))
+	// fileServer := http.FileServer(http.Dir(staticFilesDir))
+	fileServer := http.FileServer(http.Dir("dist/browser"))
 	mux.Handle("/", fileServer)
 
 	// API Routes
-	mux.HandleFunc("/api/validate-email", s.EnableCORS(s.RateLimitIP(s.HandleValidateEmail)))
-	mux.HandleFunc("/api/verify-code", s.EnableCORS(s.HandleVerifyCode))
-	mux.HandleFunc("/api/register", s.EnableCORS(s.HandleRegister))
+	mux.HandleFunc("/api/validate-email", s.LogRequest(s.EnableCORS(s.RateLimitIP(s.HandleValidateEmail))))
+	mux.HandleFunc("/api/verify-code", s.LogRequest(s.EnableCORS(s.HandleVerifyCode)))
+	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
 	mux.HandleFunc("/health", s.HandleHealth)
+
+	// Redirect /register-customer to /
+	mux.HandleFunc("/register-customer", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+	})
 
 	s.Handler = mux
 	return s
+}
+
+func (s *Server) LogRequest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("Entry", "method", r.Method, "url", r.URL.Path)
+		next(w, r)
+	}
 }
 
 func (s *Server) getIPLimiter(ip string) *rate.Limiter {
@@ -74,7 +112,7 @@ func (s *Server) RateLimitIP(next http.HandlerFunc) http.HandlerFunc {
 
 		limiter := s.getIPLimiter(ip)
 		if !limiter.Allow() {
-			s.SendJSON(w, http.StatusTooManyRequests, false, "Too many requests", nil)
+			s.SendJSON(w, r, http.StatusTooManyRequests, false, "Too many requests", nil)
 			return
 		}
 

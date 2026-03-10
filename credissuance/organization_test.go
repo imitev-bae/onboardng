@@ -54,7 +54,7 @@ func TestOrganizationAPI(t *testing.T) {
 	accessToken := "test-token"
 
 	t.Run("ListOrganizations", func(t *testing.T) {
-		orgs, err := l.ListOrganizations(accessToken, "", 0, 0)
+		orgs, err := l.TMFListOrganizations(accessToken, "", 0, 0)
 		if err != nil {
 			t.Fatalf("ListOrganizations failed: %v", err)
 		}
@@ -65,7 +65,7 @@ func TestOrganizationAPI(t *testing.T) {
 
 	t.Run("CreateOrganization", func(t *testing.T) {
 		newOrg := Organization_Create{TradingName: "Test Org"}
-		org, err := l.CreateOrganization(accessToken, &newOrg)
+		org, err := l.TMFCreateOrganization(accessToken, &newOrg)
 		if err != nil {
 			t.Fatalf("CreateOrganization failed: %v", err)
 		}
@@ -75,7 +75,7 @@ func TestOrganizationAPI(t *testing.T) {
 	})
 
 	t.Run("RetrieveOrganization", func(t *testing.T) {
-		org, err := l.RetrieveOrganization(accessToken, "1", "")
+		org, err := l.TMFRetrieveOrganization(accessToken, "1", "")
 		if err != nil {
 			t.Fatalf("RetrieveOrganization failed: %v", err)
 		}
@@ -86,7 +86,7 @@ func TestOrganizationAPI(t *testing.T) {
 
 	t.Run("PatchOrganization", func(t *testing.T) {
 		update := Organization_Update{Name: "Updated Name"}
-		org, err := l.PatchOrganization(accessToken, "1", &update)
+		org, err := l.TMFPatchOrganization(accessToken, "1", &update)
 		if err != nil {
 			t.Fatalf("PatchOrganization failed: %v", err)
 		}
@@ -96,7 +96,7 @@ func TestOrganizationAPI(t *testing.T) {
 	})
 
 	t.Run("DeleteOrganization", func(t *testing.T) {
-		err := l.DeleteOrganization(accessToken, "1")
+		err := l.TMFDeleteOrganization(accessToken, "1")
 		if err != nil {
 			t.Fatalf("DeleteOrganization failed: %v", err)
 		}
@@ -113,7 +113,7 @@ func TestOrganizationAPI(t *testing.T) {
 		defer serverEmpty.Close()
 
 		lEmpty := &LEARIssuance{verifierURL: serverEmpty.URL}
-		err := lEmpty.DeleteOrganization("", "1")
+		err := lEmpty.TMFDeleteOrganization("", "1")
 		if err != nil {
 			t.Fatalf("DeleteOrganization failed: %v", err)
 		}
@@ -136,7 +136,7 @@ func TestMyOrganization(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := MyOrganization()
+			got, gotErr := MyTMFOrganization()
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("MyOrganization() failed: %v", gotErr)
