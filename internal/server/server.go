@@ -73,10 +73,13 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
 	mux.HandleFunc("/health", s.HandleHealth)
 
-	// Redirect /register-customer to /
-	mux.HandleFunc("/register-customer", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/", http.StatusMovedPermanently)
-	})
+	// Serve Angular SPA routes
+	serveIndex := func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "dist/browser/index.html")
+	}
+	mux.HandleFunc("/register-customer", serveIndex)
+	mux.HandleFunc("/register-provider", serveIndex)
+	mux.HandleFunc("/onboard-provider", serveIndex)
 
 	s.Handler = mux
 	return s
