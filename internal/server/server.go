@@ -19,6 +19,9 @@ type DBServiceProvider interface {
 	SaveRegistrationError(regErr *db.RegistrationError) error
 	GetRegistrationByVatID(vatID string) (*db.RegistrationRecord, error)
 	GetRegistrationByEmail(email string) (*db.RegistrationRecord, error)
+	GetRegistrations(limit, offset int) ([]db.RegistrationRecord, error)
+	GetRegistrationErrors(limit, offset int) ([]db.RegistrationError, error)
+	GetRegistrationFiles(limit, offset int) ([]db.RegistrationFile, error)
 }
 
 type MailServiceProvider interface {
@@ -82,6 +85,10 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 		// Otherwise serve static files
 		fileServer.ServeHTTP(w, r)
 	})
+
+	// Admin dashboard static files
+	adminFileServer := http.FileServer(http.Dir("docs/admin"))
+	mux.Handle("/admin/", http.StripPrefix("/admin/", adminFileServer))
 
 	// API Routes
 	mux.HandleFunc("/api/validate-email", s.LogRequest(s.EnableCORS(s.RateLimitIP(s.HandleValidateEmail))))
