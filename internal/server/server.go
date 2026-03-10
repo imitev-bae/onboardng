@@ -68,7 +68,23 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	// Static file serving
 	// fileServer := http.FileServer(http.Dir(staticFilesDir))
 	fileServer := http.FileServer(http.Dir("dist/browser"))
-	mux.Handle("/", fileServer)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Only intercept exactly "/"
+		if r.URL.Path == "/" {
+			page := r.URL.Query().Get("page")
+			switch page {
+			case "buyer":
+				http.Redirect(w, r, "/register-customer", http.StatusMovedPermanently)
+				return
+			case "seller":
+				http.Redirect(w, r, "/register-provider", http.StatusMovedPermanently)
+				return
+			}
+		}
+
+		// Otherwise serve static files
+		fileServer.ServeHTTP(w, r)
+	})
 
 	// Admin dashboard static files
 	adminFileServer := http.FileServer(http.Dir("docs/admin"))
@@ -80,14 +96,13 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
 	mux.HandleFunc("/health", s.HandleHealth)
 
-	mux.HandleFunc("/api/admin/registrations", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrations)))
-	mux.HandleFunc("/api/admin/registration-errors", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationErrors)))
-	mux.HandleFunc("/api/admin/registration-files", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationFiles)))
-
-	// Redirect /register-customer to /
-	mux.HandleFunc("/register-customer", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/", http.StatusMovedPermanently)
-	})
+	// Serve Angular SPA routes
+	serveIndex := func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "dist/browser/index.html")
+	}
+	mux.HandleFunc("/register-customer", serveIndex)
+	mux.HandleFunc("/register-provider", serveIndex)
+	mux.HandleFunc("/onboard-provider", serveIndex)
 
 	s.Handler = mux
 	return s
