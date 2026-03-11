@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, ElementRef, EventEmitter, Input, Output, QueryList, ViewChildren } from '@angular/core';
+import { Component, ViewEncapsulation, ElementRef, EventEmitter, Input, Output, QueryList, ViewChildren, OnDestroy, ChangeDetectorRef, inject } from '@angular/core';
 import { NgClass } from '@angular/common';
 
 @Component({
@@ -9,16 +9,22 @@ import { NgClass } from '@angular/common';
   styleUrl: './email-verification.component.css',
   encapsulation: ViewEncapsulation.None
 })
-export class EmailVerificationComponent {
+export class EmailVerificationComponent implements OnDestroy {
+  private cdr = inject(ChangeDetectorRef);
+
   @Input() email = '';
+
   @Input() isLoading = false;
   @Input() errorMessage = '';
   @Output() verify = new EventEmitter<string>();
   @Output() resend = new EventEmitter<void>();
+  @Output() editEmail = new EventEmitter<void>();
 
   @ViewChildren('otpInput') otpInputs!: QueryList<ElementRef>;
 
   otpDigits: string[] = ['', '', '', '', '', ''];
+  resendCooldown = 0;
+  private cooldownInterval: ReturnType<typeof setInterval> | null = null;
 
   get otpCode(): string {
     return this.otpDigits.join('');
@@ -89,5 +95,30 @@ export class EmailVerificationComponent {
     inputs.forEach(input => input.nativeElement.value = '');
     inputs[0].nativeElement.focus();
     this.resend.emit();
+    this.startCooldown();
+  }
+
+  private startCooldown(): void {
+    this.clearCooldown();
+    this.resendCooldown = 60;
+    this.cooldownInterval = setInterval(() => {
+      this.resendCooldown--;
+      if (this.resendCooldown <= 0) {
+        this.clearCooldown();
+      }
+      this.cdr.detectChanges();
+    }, 1000);
+  }
+
+  private clearCooldown(): void {
+    if (this.cooldownInterval) {
+      clearInterval(this.cooldownInterval);
+      this.cooldownInterval = null;
+    }
+    this.resendCooldown = 0;
+  }
+
+  ngOnDestroy(): void {
+    this.clearCooldown();
   }
 }

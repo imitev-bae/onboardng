@@ -29,6 +29,7 @@ export class OnboardingProviderComponent {
   private cdr = inject(ChangeDetectorRef);
 
   currentStep = 0;
+  showVerificationModal = false;
   isValidatingEmail = false;
   emailError = '';
   isVerifyingCode = false;
@@ -80,6 +81,11 @@ export class OnboardingProviderComponent {
     this.currentStep--;
   }
 
+  goBackToRepresentative(): void {
+    this.verifiedCode = '';
+    this.currentStep = 2;
+  }
+
   validateEmailAndNext(): void {
     const email = this.representativeGroup.get('email')?.value;
     this.isValidatingEmail = true;
@@ -95,7 +101,7 @@ export class OnboardingProviderComponent {
         next: (res: any) => {
           this.isValidatingEmail = false;
           if (res && res.success === true) {
-            this.currentStep++;
+            this.showVerificationModal = true;
           } else {
             this.emailError = res?.message || 'Failed to validate email. Please try again.';
           }
@@ -107,6 +113,11 @@ export class OnboardingProviderComponent {
           this.cdr.detectChanges();
         }
       });
+  }
+
+  onEditEmail(): void {
+    this.showVerificationModal = false;
+    this.verifyError = '';
   }
 
   onVerify(code: string): void {
@@ -125,6 +136,7 @@ export class OnboardingProviderComponent {
           this.isVerifyingCode = false;
           if (res && res.success === true) {
             this.verifiedCode = code;
+            this.showVerificationModal = false;
             this.currentStep = 4;
           } else {
             this.verifyError = res?.message || 'Invalid verification code. Please try again.';
