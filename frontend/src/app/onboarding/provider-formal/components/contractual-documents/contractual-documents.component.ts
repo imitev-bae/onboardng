@@ -25,7 +25,10 @@ export class ContractualDocumentsComponent {
   }
 
   downloadLearAppointment(): void {
-    // TODO: Download LEAR appointment PDF from API or static asset
+    const a = document.createElement('a');
+    a.href = 'CSP Account administrator appointment Form v.March 2026.docx';
+    a.download = 'CSP Account administrator appointment Form v.March 2026.docx';
+    a.click();
   }
 
   onDragOver(event: DragEvent): void {
