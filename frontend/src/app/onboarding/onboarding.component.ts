@@ -4,7 +4,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { LandingComponent } from './components/landing/landing.component';
 import { TermsComponent } from './components/terms/terms.component';
 import { RepresentativeComponent } from './components/representative/representative.component';
-import { CompanyInfoComponent } from './components/company-info/company-info.component';
+import { CompanyInfoComponent, WORLD_COUNTRIES } from './components/company-info/company-info.component';
 import { EmailVerificationComponent } from './components/email-verification/email-verification.component';
 import { SuccessComponent } from './components/success/success.component';
 
@@ -28,7 +28,9 @@ export class OnboardingComponent {
   private http = inject(HttpClient);
   private cdr = inject(ChangeDetectorRef);
 
+  worldCountries = WORLD_COUNTRIES;
   currentStep = 0;
+  showVerificationModal = false;
   isValidatingEmail = false;
   emailError = '';
   isVerifyingCode = false;
@@ -80,6 +82,11 @@ export class OnboardingComponent {
     this.currentStep--;
   }
 
+  goBackToRepresentative(): void {
+    this.verifiedCode = '';
+    this.currentStep = 2;
+  }
+
   validateEmailAndNext(): void {
     const email = this.representativeGroup.get('email')?.value;
     this.isValidatingEmail = true;
@@ -95,7 +102,7 @@ export class OnboardingComponent {
         next: (res: any) => {
           this.isValidatingEmail = false;
           if (res && res.success === true) {
-            this.currentStep++;
+            this.showVerificationModal = true;
           } else {
             this.emailError = res?.message || 'Failed to validate email. Please try again.';
           }
@@ -107,6 +114,11 @@ export class OnboardingComponent {
           this.cdr.detectChanges();
         }
       });
+  }
+
+  onEditEmail(): void {
+    this.showVerificationModal = false;
+    this.verifyError = '';
   }
 
   onVerify(code: string): void {
@@ -125,6 +137,7 @@ export class OnboardingComponent {
           this.isVerifyingCode = false;
           if (res && res.success === true) {
             this.verifiedCode = code;
+            this.showVerificationModal = false;
             this.currentStep = 4;
           } else {
             this.verifyError = res?.message || 'Invalid verification code. Please try again.';

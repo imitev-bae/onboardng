@@ -27,25 +27,33 @@
       (back)="goBack()">
     </app-representative>
   }
-  @case (3) {
-    <app-email-verification
-      [email]="representativeGroup.get('email')?.value"
-      [isLoading]="isVerifyingCode"
-      [errorMessage]="verifyError"
-      (verify)="onVerify($event)"
-      (resend)="onResendCode()">
-    </app-email-verification>
-  }
   @case (4) {
     <app-company-info
       [formGroup]="companyGroup"
+      [countries]="worldCountries"
       [isLoading]="isRegistering"
       [errorMessage]="registerError"
       (complete)="onComplete()"
-      (back)="goBack()">
+      (back)="goBackToRepresentative()">
     </app-company-info>
   }
   @case (5) {
     <app-success></app-success>
   }
+}
+
+@if (showVerificationModal) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0" style="background: rgba(11, 21, 40, 0.5); backdrop-filter: blur(8px)"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl p-10 w-full max-w-[846px] mx-6">
+      <app-email-verification
+        [email]="representativeGroup.get('email')?.value"
+        [isLoading]="isVerifyingCode"
+        [errorMessage]="verifyError"
+        (verify)="onVerify($event)"
+        (resend)="onResendCode()"
+        (editEmail)="onEditEmail()">
+      </app-email-verification>
+    </div>
+  </div>
 }
