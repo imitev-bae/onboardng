@@ -22,6 +22,7 @@ type DBServiceProvider interface {
 	GetRegistrations(limit, offset int) ([]db.RegistrationRecord, error)
 	GetRegistrationErrors(limit, offset int) ([]db.RegistrationError, error)
 	GetRegistrationFiles(limit, offset int) ([]db.RegistrationFile, error)
+	GetRegistrationFile(fileID string) (*db.RegistrationFile, error)
 }
 
 type MailServiceProvider interface {
@@ -95,6 +96,11 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	mux.HandleFunc("/api/verify-code", s.LogRequest(s.EnableCORS(s.HandleVerifyCode)))
 	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
 	mux.HandleFunc("/health", s.HandleHealth)
+
+	mux.HandleFunc("/api/admin/registrations", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrations)))
+	mux.HandleFunc("/api/admin/registration-errors", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationErrors)))
+	mux.HandleFunc("/api/admin/registration-files", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationFiles)))
+	mux.HandleFunc("/api/admin/file/", s.LogRequest(s.EnableCORS(s.HandleAdminGetFile)))
 
 	// Serve Angular SPA routes
 	serveIndex := func(w http.ResponseWriter, r *http.Request) {
