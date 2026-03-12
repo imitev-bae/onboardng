@@ -98,3 +98,27 @@ func (s *Server) HandleAdminGetRegistrationFiles(w http.ResponseWriter, r *http.
 
 	s.SendJSON(w, r, http.StatusOK, true, "Registration files fetched successfully", files)
 }
+
+// HandleAdminGetFile returns a single file for inline viewing
+func (s *Server) HandleAdminGetFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	fileID := r.URL.Path[len("/api/admin/file/"):]
+	if fileID == "" {
+		http.Error(w, "Missing file ID", http.StatusBadRequest)
+		return
+	}
+
+	file, err := s.DB.GetRegistrationFile(fileID)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", file.MimeType)
+	w.Header().Set("Content-Disposition", "inline; filename=\""+file.Name+"\"")
+	w.Write(file.Content)
+}

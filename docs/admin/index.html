@@ -65,7 +65,6 @@
                 <thead>
                     <tr class="dome-bgcolor">
                         <th>Date</th>
-                        <th>Reg ID</th>
                         <th>Company</th>
                         <th>Email</th>
                         <th>Status</th>
@@ -75,9 +74,10 @@
                 <template x-for="reg in registrations" :key="reg.registration_id">
                     <tbody class="w3-border-bottom">
                         
-                        <tr>
+                        <tr @click="toggleExpansion(reg, 'details')" 
+                            :class="{'w3-pale-red': getErrors(reg.registration_id).length > 0, 'w3-hover-light-grey': getErrors(reg.registration_id).length === 0, 'w3-hover-pale-red': getErrors(reg.registration_id).length > 0}" 
+                            style="cursor: pointer;">
                             <td x-text="formatDate(reg.created_at)"></td>
-                            <td x-text="reg.registration_id" style="font-family: monospace;"></td>
                             <td x-text="reg.company_name + (reg.vat_id ? ' (' + reg.vat_id + ')' : '')"></td>
                             <td x-text="reg.email"></td>
                             <td>
@@ -90,19 +90,19 @@
                             </td>
                             <td>
                                 <button class="w3-button w3-small w3-border w3-round w3-light-grey"
-                                    @click="toggleExpansion(reg, 'details')">Details</button>
-                                <button class="w3-button w3-small w3-border w3-round w3-light-grey"
-                                    @click="toggleExpansion(reg, 'files')">Files</button>
-                                <button class="w3-button w3-small w3-border w3-round w3-light-grey"
-                                    @click="toggleExpansion(reg, 'errors')">Errors</button>
+                                    @click.stop="toggleExpansion(reg, 'files')">Files</button>
+                                <button class="w3-button w3-small w3-border w3-round"
+                                    :class="getErrors(reg.registration_id).length > 0 ? 'w3-red w3-hover-red' : 'w3-light-grey'"
+                                    @click.stop="toggleExpansion(reg, 'errors')">Errors</button>
                             </td>
                         </tr>
 
                         
                         <tr x-show="isExpanded(reg, 'details')" style="background-color: #fcfcfc;">
-                            <td colspan="6" class="w3-padding-16">
+                            <td colspan="5" class="w3-padding-16">
                                 <div class="w3-row">
                                     <div class="w3-half">
+                                        <p><strong>Reg ID:</strong> <span x-text="reg.registration_id" style="font-family: monospace;"></span></p>
                                         <p><strong>First Name:</strong> <span x-text="reg.first_name"></span></p>
                                         <p><strong>Last Name:</strong> <span x-text="reg.last_name"></span></p>
                                         <p><strong>Email:</strong> <span x-text="reg.email"></span></p>
@@ -120,7 +120,7 @@
 
                         
                         <tr x-show="isExpanded(reg, 'files')" style="background-color: #fcfcfc;">
-                            <td colspan="6" class="w3-padding-16">
+                            <td colspan="5" class="w3-padding-16">
                                 <div x-show="loadingSub === 'files'">Loading files...</div>
                                 <div x-show="loadingSub !== 'files'">
                                     <template x-if="getFiles(reg.vat_id).length === 0">
@@ -129,7 +129,9 @@
                                     <ul class="w3-ul w3-border w3-white" x-show="getFiles(reg.vat_id).length > 0">
                                         <template x-for="file in getFiles(reg.vat_id)" :key="file.file_id">
                                             <li>
-                                                <strong x-text="file.name"></strong>
+                                                <a :href="'/api/admin/file/' + file.file_id" target="_blank" @click.stop class="w3-text-blue w3-hover-text-indigo" style="text-decoration: none;">
+                                                    <strong x-text="file.name"></strong>
+                                                </a>
                                                 <span class="w3-text-grey"
                                                     x-text="'(' + formatBytes(file.size) + ') '"></span>
                                                 <span class="w3-tag w3-small w3-round w3-blue"
@@ -143,7 +145,7 @@
 
                         
                         <tr x-show="isExpanded(reg, 'errors')" style="background-color: #fdf5f5;">
-                            <td colspan="6" class="w3-padding-16">
+                            <td colspan="5" class="w3-padding-16">
                                 <div x-show="loadingSub === 'errors'">Loading errors...</div>
                                 <div x-show="loadingSub !== 'errors'">
                                     <template x-if="getErrors(reg.registration_id).length === 0">
@@ -181,7 +183,10 @@
             messageType: '',
 
             async initData() {
-                await this.fetchRegistrations()
+                
+                await this.fetchRegistrations();
+                
+                await this.fetchErrors();
             },
 
             async callApi(endpoint) {
@@ -276,7 +281,13 @@
             formatDate(d) {
                 if (!d) return '';
                 const date = new Date(d);
-                return date.toLocaleString();
+                const yyyy = date.getFullYear();
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                const hh = String(date.getHours()).padStart(2, '0');
+                const min = String(date.getMinutes()).padStart(2, '0');
+                const ss = String(date.getSeconds()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
             },
 
             formatBytes(bytes, decimals = 2) {

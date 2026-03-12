@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hesusruiz/onboardng/common"
 	"github.com/hesusruiz/onboardng/credissuance"
 	"github.com/hesusruiz/onboardng/internal/configuration"
 	"github.com/hesusruiz/onboardng/internal/db"
@@ -183,9 +182,6 @@ func (s *RegistrationRequest) Validate() error {
 	}
 	if s.Country == "" {
 		return fmt.Errorf("country is required")
-	}
-	if !common.IsValidCountry(s.Country) {
-		return fmt.Errorf("invalid country code")
 	}
 	if s.VatId == "" {
 		return fmt.Errorf("VAT ID is required")
