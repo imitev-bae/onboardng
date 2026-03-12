@@ -4,7 +4,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { LandingComponent } from './components/landing/landing.component';
 import { TermsComponent } from './components/terms/terms.component';
 import { RepresentativeComponent } from './components/representative/representative.component';
-import { CompanyInfoComponent } from './components/company-info/company-info.component';
+import { CompanyInfoComponent, WORLD_COUNTRIES } from './components/company-info/company-info.component';
 import { EmailVerificationComponent } from './components/email-verification/email-verification.component';
 import { SuccessComponent } from './components/success/success.component';
 
@@ -28,6 +28,7 @@ export class OnboardingComponent {
   private http = inject(HttpClient);
   private cdr = inject(ChangeDetectorRef);
 
+  worldCountries = WORLD_COUNTRIES;
   currentStep = 0;
   showVerificationModal = false;
   isValidatingEmail = false;

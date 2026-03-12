@@ -30,6 +30,7 @@
   @case (4) {
     <app-company-info
       [formGroup]="companyGroup"
+      [countries]="worldCountries"
       [isLoading]="isRegistering"
       [errorMessage]="registerError"
       (complete)="onComplete()"
