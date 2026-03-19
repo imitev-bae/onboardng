@@ -24,6 +24,7 @@ type RegistrationRecord struct {
 	Country        string    `json:"country"`
 	VatID          string    `json:"vat_id"`
 	StreetAddress  string    `json:"street_address"`
+	City           string    `json:"city"`
 	PostalCode     string    `json:"postal_code"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -88,6 +89,7 @@ func NewService(runtime configuration.RuntimeEnv, path string) (*Service, error)
 		country TEXT,
 		vat_id TEXT UNIQUE,
 		street_address TEXT,
+		city TEXT,
 		postal_code TEXT,
 		notified BOOLEAN,
 		issued BOOLEAN,
@@ -133,11 +135,11 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 	insertQuery := `
 	INSERT INTO registrations (
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, postal_code,
+		street_address, city, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	) VALUES (
 		:registration_id, :email, :first_name, :last_name, :company_name, :country, :vat_id,
-		:street_address, :postal_code,
+		:street_address, :city, :postal_code,
 		:created_at, :updated_at, :notified, :issued, :tmf_registered
 	)`
 
@@ -182,6 +184,7 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 			sql.Named("country", reg.Country),
 			sql.Named("vat_id", reg.VatID),
 			sql.Named("street_address", reg.StreetAddress),
+			sql.Named("city", reg.City),
 			sql.Named("postal_code", reg.PostalCode),
 			sql.Named("created_at", reg.CreatedAt),
 			sql.Named("updated_at", reg.UpdatedAt),
@@ -221,6 +224,7 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 			sql.Named("country", reg.Country),
 			sql.Named("vat_id", reg.VatID),
 			sql.Named("street_address", reg.StreetAddress),
+			sql.Named("city", reg.City),
 			sql.Named("postal_code", reg.PostalCode),
 			sql.Named("created_at", reg.CreatedAt),
 			sql.Named("updated_at", reg.UpdatedAt),
@@ -274,6 +278,7 @@ func (s *Service) AmendRegistration(reg *RegistrationRecord) error {
 		company_name = :company_name,
 		country = :country,
 		street_address = :street_address,
+		city = :city,
 		postal_code = :postal_code,
 		updated_at = :updated_at,
 		notified = :notified,
@@ -286,6 +291,7 @@ func (s *Service) AmendRegistration(reg *RegistrationRecord) error {
 		sql.Named("company_name", reg.CompanyName),
 		sql.Named("country", reg.Country),
 		sql.Named("street_address", reg.StreetAddress),
+		sql.Named("city", reg.City),
 		sql.Named("postal_code", reg.PostalCode),
 		sql.Named("updated_at", reg.UpdatedAt),
 		sql.Named("notified", reg.Notified),
@@ -303,7 +309,7 @@ func (s *Service) GetRegistrations(limit, offset int) ([]RegistrationRecord, err
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, postal_code,
+		street_address, city, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
 	ORDER BY created_at DESC
@@ -323,7 +329,7 @@ func (s *Service) GetRegistrations(limit, offset int) ([]RegistrationRecord, err
 		var reg RegistrationRecord
 		err := rows.Scan(
 			&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-			&reg.StreetAddress, &reg.PostalCode,
+			&reg.StreetAddress, &reg.City, &reg.PostalCode,
 			&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
 		)
 		if err != nil {
@@ -343,7 +349,7 @@ func (s *Service) GetRegistration(vatID string, email string) (*RegistrationReco
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, postal_code,
+		street_address, city, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
 	WHERE vat_id = :vat_id AND email = :email`
@@ -354,7 +360,7 @@ func (s *Service) GetRegistration(vatID string, email string) (*RegistrationReco
 		sql.Named("email", email),
 	).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-		&reg.StreetAddress, &reg.PostalCode,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
 	)
 	if err != nil {
@@ -369,7 +375,7 @@ func (s *Service) GetRegistrationByEmailOrVatID(email string, vatID string) (*Re
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, postal_code,
+		street_address, city, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
 	WHERE email = :email OR vat_id = :vat_id`
@@ -380,7 +386,7 @@ func (s *Service) GetRegistrationByEmailOrVatID(email string, vatID string) (*Re
 		sql.Named("vat_id", vatID),
 	).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-		&reg.StreetAddress, &reg.PostalCode,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
 	)
 	if err != nil {
@@ -393,7 +399,7 @@ func (s *Service) GetRegistrationByVatID(vatID string) (*RegistrationRecord, err
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, postal_code,
+		street_address, city, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
 	WHERE vat_id = :vat_id`
@@ -401,7 +407,7 @@ func (s *Service) GetRegistrationByVatID(vatID string) (*RegistrationRecord, err
 	var reg RegistrationRecord
 	err := s.conn.QueryRow(query, sql.Named("vat_id", vatID)).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-		&reg.StreetAddress, &reg.PostalCode,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
 	)
 	if err != nil {
@@ -414,7 +420,7 @@ func (s *Service) GetRegistrationByEmail(email string) (*RegistrationRecord, err
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, postal_code,
+		street_address, city, postal_code,
 		created_at, updated_at, notified, issued, tmf_registered
 	FROM registrations
 	WHERE email = :email`
@@ -422,7 +428,7 @@ func (s *Service) GetRegistrationByEmail(email string) (*RegistrationRecord, err
 	var reg RegistrationRecord
 	err := s.conn.QueryRow(query, sql.Named("email", email)).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-		&reg.StreetAddress, &reg.PostalCode,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
 	)
 	if err != nil {

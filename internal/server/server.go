@@ -41,6 +41,7 @@ type IssuanceServiceProvider interface {
 	TMFDeleteOrganization(accessToken string, id string) error
 	LEARIssuanceRequest(accessToken string, learCredData *credissuance.LEARIssuanceRequestBody) ([]byte, error)
 	TMFCreateOrganization(accessToken string, org *credissuance.Organization_Create) (*credissuance.Organization, error)
+	TMFUpdateOrganization(accessToken string, id string, org *credissuance.Organization_Update) (*credissuance.Organization, error)
 }
 
 type Server struct {

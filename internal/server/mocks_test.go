@@ -71,6 +71,7 @@ type MockIssuance struct {
 	TMFDeleteOrganizationFunc    func(accessToken string, id string) error
 	LEARIssuanceRequestFunc      func(accessToken string, learCredData *credissuance.LEARIssuanceRequestBody) ([]byte, error)
 	TMFCreateOrganizationFunc    func(accessToken string, org *credissuance.Organization_Create) (*credissuance.Organization, error)
+	TMFUpdateOrganizationFunc    func(accessToken string, id string, org *credissuance.Organization_Update) (*credissuance.Organization, error)
 }
 
 func (m *MockIssuance) GetAccessToken() (string, error) {
@@ -87,4 +88,7 @@ func (m *MockIssuance) LEARIssuanceRequest(accessToken string, learCredData *cre
 }
 func (m *MockIssuance) TMFCreateOrganization(accessToken string, org *credissuance.Organization_Create) (*credissuance.Organization, error) {
 	return m.TMFCreateOrganizationFunc(accessToken, org)
+}
+func (m *MockIssuance) TMFUpdateOrganization(accessToken string, id string, org *credissuance.Organization_Update) (*credissuance.Organization, error) {
+	return m.TMFUpdateOrganizationFunc(accessToken, id, org)
 }

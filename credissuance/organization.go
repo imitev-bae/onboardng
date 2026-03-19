@@ -374,6 +374,7 @@ type RegistrationRequest struct {
 	Country       string `json:"country"`
 	VatId         string `json:"vatId"`
 	StreetAddress string `json:"streetAddress"`
+	City          string `json:"city"`
 	PostalCode    string `json:"postalCode"`
 	Email         string `json:"email"`
 	Code          string `json:"code"`
@@ -505,6 +506,64 @@ func TMFOrganizationFromRequest(requestData RegistrationRequest) *Organization_C
 			MediumType: "postalAddress",
 			Characteristic: &MediumCharacteristic{
 				Street1:  requestData.StreetAddress,
+				City:     requestData.City,
+				PostCode: requestData.PostalCode,
+				Country:  requestData.Country,
+			},
+		},
+	}
+
+	org.PartyCharacteristic = []Characteristic{
+		{
+			Name:      "country",
+			Value:     requestData.Country,
+			ValueType: "string",
+		},
+	}
+
+	return &org
+}
+
+func TMFOrganizationUpdateFromRequest(requestData RegistrationRequest) *Organization_Update {
+	org := Organization_Update{}
+	org.Type = "organization"
+	org.Name = requestData.CompanyName
+	org.Status = "initialized"
+
+	org.IsHeadOffice = true
+	org.IsLegalEntity = true
+	org.TradingName = requestData.CompanyName
+	org.OrganizationType = "company"
+
+	org.OrganizationIdentification = []OrganizationIdentification{
+		{
+			Type:               "organizationIdentification",
+			IdentificationID:   requestData.VatId,
+			IdentificationType: "elsi",
+			IssuingAuthority:   "eIDAS",
+		},
+	}
+
+	org.ExternalReference = []ExternalReference{
+		{
+			ExternalReferenceType: "idm_id",
+			Name:                  requestData.VatId,
+		},
+	}
+
+	org.ContactMedium = []ContactMedium{
+		{
+			MediumType: "email",
+			Preferred:  true,
+			Characteristic: &MediumCharacteristic{
+				EmailAddress: requestData.Email,
+			},
+		},
+		{
+			MediumType: "postalAddress",
+			Characteristic: &MediumCharacteristic{
+				Street1:  requestData.StreetAddress,
+				City:     requestData.City,
 				PostCode: requestData.PostalCode,
 				Country:  requestData.Country,
 			},
@@ -583,8 +642,8 @@ func (l *LEARIssuance) TMFRetrieveOrganization(accessToken string, id string, fi
 	return &org, nil
 }
 
-// TMFPatchOrganization partially updates a Organization.
-func (l *LEARIssuance) TMFPatchOrganization(accessToken string, id string, org *Organization_Update) (*Organization, error) {
+// TMFUpdateOrganization partially updates a Organization.
+func (l *LEARIssuance) TMFUpdateOrganization(accessToken string, id string, org *Organization_Update) (*Organization, error) {
 	buf, err := json.Marshal(org)
 	if err != nil {
 		return nil, errl.Errorf("error marshalling request body: %w", err)

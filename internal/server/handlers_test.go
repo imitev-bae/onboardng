@@ -88,6 +88,11 @@ func TestHandleValidateEmail(t *testing.T) {
 func TestHandleVerifyCode(t *testing.T) {
 	s := &Server{
 		VerificationCodes: make(map[string]*VerificationCodeEntry),
+		DB: &MockDB{
+			GetRegistrationByEmailFunc: func(email string) (*db.RegistrationRecord, error) {
+				return nil, fmt.Errorf("not found")
+			},
+		},
 	}
 
 	t.Run("Invalid Code", func(t *testing.T) {
@@ -153,7 +158,11 @@ func TestHandleVerifyCode(t *testing.T) {
 }
 
 func TestHandleRegister(t *testing.T) {
-	mockDB := &MockDB{}
+	mockDB := &MockDB{
+		GetRegistrationByEmailOrVatIDFunc: func(email, vatID string) (*db.RegistrationRecord, error) {
+			return nil, fmt.Errorf("not found")
+		},
+	}
 	mockMail := &MockMail{}
 	mockIssuance := &MockIssuance{}
 	s := &Server{
@@ -171,6 +180,7 @@ func TestHandleRegister(t *testing.T) {
 		Country:       "ES",
 		VatId:         "ESB12345678",
 		StreetAddress: "Main St 1",
+		City:          "Madrid",
 		PostalCode:    "28001",
 		Email:         "john@example.com",
 		Code:          "123456",
@@ -232,6 +242,9 @@ func TestHandleRegister(t *testing.T) {
 		mockDB.UpdateRegistrationStatusFunc = func(reg *db.RegistrationRecord) error { return nil }
 		mockIssuance.TMFCreateOrganizationFunc = func(token string, org *credissuance.Organization_Create) (*credissuance.Organization, error) {
 			return &credissuance.Organization{ID: "neworg"}, nil
+		}
+		mockIssuance.TMFUpdateOrganizationFunc = func(token string, id string, org *credissuance.Organization_Update) (*credissuance.Organization, error) {
+			return &credissuance.Organization{ID: id}, nil
 		}
 
 		s.HandleRegister(w, req)
