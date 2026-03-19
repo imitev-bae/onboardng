@@ -84,11 +84,11 @@ func TestOrganizationAPI(t *testing.T) {
 		}
 	})
 
-	t.Run("PatchOrganization", func(t *testing.T) {
+	t.Run("UpdateOrganization", func(t *testing.T) {
 		update := Organization_Update{Name: "Updated Name"}
-		org, err := l.TMFPatchOrganization(accessToken, "1", &update)
+		org, err := l.TMFUpdateOrganization(accessToken, "1", &update)
 		if err != nil {
-			t.Fatalf("PatchOrganization failed: %v", err)
+			t.Fatalf("UpdateOrganization failed: %v", err)
 		}
 		if org.ID != "1" {
 			t.Errorf("expected org ID 1, got %s", org.ID)
