@@ -76,8 +76,8 @@ func generateCode() string {
 	return fmt.Sprintf("%06d", n)
 }
 
-// isValidEmail checks if the email address provided has a valid format
-func isValidEmail(email string) bool {
+// isValidEmailFormat checks if the email address provided has a valid format
+func isValidEmailFormat(email string) bool {
 	re := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$`)
 	return re.MatchString(strings.ToLower(email))
 }
@@ -89,7 +89,7 @@ func generateRegistrationID() string {
 	return fmt.Sprintf("%s-%08d", dateStr, n)
 }
 
-func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleSendEmailValidationCode(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -108,7 +108,7 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Email == "" || !isValidEmail(req.Email) {
+	if req.Email == "" || !isValidEmailFormat(req.Email) {
 		s.SendJSON(w, r, http.StatusBadRequest, false, "A valid email is required", nil)
 		return
 	}
@@ -123,7 +123,7 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 	code := generateCode()
 	s.StoreVerificationCode(req.Email, code)
 
-	// Send the code to the user
+	// Send the code to the user in a separate goroutine
 	go func() {
 		if err := s.Mail.SendVerificationCode(req.Email, code); err != nil {
 			slog.Error("❌ Error sending verification code", "error", err)
@@ -133,7 +133,7 @@ func (s *Server) HandleValidateEmail(w http.ResponseWriter, r *http.Request) {
 	s.SendJSON(w, r, http.StatusOK, true, "Validation code sent to your email", map[string]string{"code": code})
 }
 
-func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleValidateEmailCode(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -158,7 +158,28 @@ func (s *Server) HandleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.SendJSON(w, r, http.StatusOK, true, "Email verified successfully", nil)
+	// Check if there is a registratrion for this email
+	regRecord, err := s.DB.GetRegistrationByEmail(req.Email)
+	if err != nil {
+		// Just send a successful response to avoid leaking information
+		s.SendJSON(w, r, http.StatusOK, true, "Email verified successfully", nil)
+		return
+	}
+
+	// Send back a successful message including the registration data
+	// Convert the registration record to a registratrion request
+	regRequest := RegistrationRequest{
+		FirstName:     regRecord.FirstName,
+		LastName:      regRecord.LastName,
+		CompanyName:   regRecord.CompanyName,
+		Country:       regRecord.Country,
+		VatId:         regRecord.VatID,
+		StreetAddress: regRecord.StreetAddress,
+		PostalCode:    regRecord.PostalCode,
+		Email:         regRecord.Email,
+	}
+
+	s.SendJSON(w, r, http.StatusOK, true, "Email verified successfully", regRequest)
 }
 
 // HandleHealth returns a simple 200 OK response for health checks
@@ -195,7 +216,7 @@ func (s *RegistrationRequest) Validate() error {
 	if s.Email == "" {
 		return fmt.Errorf("email is required")
 	}
-	if !isValidEmail(s.Email) {
+	if !isValidEmailFormat(s.Email) {
 		return fmt.Errorf("invalid email address format")
 	}
 	if s.Code == "" {
@@ -243,13 +264,30 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
 		return
 	}
-	s.DeleteVerificationCode(requestData.Email)
 
 	slog.Info("Attempting to issue credential for registration", "email", requestData.Email, "vatID", requestData.VatId)
 
-	//
-	// Perform the registration
-	//
+	// Check if there is a registration for this email or VAT ID
+	regRecord, err := s.DB.GetRegistrationByEmailOrVatID(requestData.Email, requestData.VatId)
+
+	// There are several possibilities:
+	// 1. If new email == old email AND new vatID != old vatID, reject with message "email already registered"
+	// 2. If new vatID == old vatID AND new email != old email, reject with message "company already registered"
+	// 3. If new email == old email AND new vatID == old vatID, continue with the request
+	// 4. If new email != old email AND new vatID != old vatID, continue with the request
+
+	if err == nil {
+		if regRecord.Email == requestData.Email && regRecord.VatID != requestData.VatId {
+			s.SendJSON(w, r, http.StatusConflict, false, "Email already registered", nil)
+			return
+		}
+		if regRecord.VatID == requestData.VatId && regRecord.Email != requestData.Email {
+			s.SendJSON(w, r, http.StatusConflict, false, "Company already registered", nil)
+			return
+		}
+	}
+
+	s.DeleteVerificationCode(requestData.Email)
 
 	// Get an access token to authenticate in the Issuer and TM Forum APIs
 	token, err := s.Issuer.GetAccessToken()
@@ -308,11 +346,12 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		err = errl.Errorf("Failed to send welcome email: %w", err)
 		slog.Error("❌ Error sending welcome email", "error", err)
 		// Record the error in the database
-		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
+		_ = s.DB.SaveRegistrationLog(&db.RegistrationLog{
 			RegistrationID: reg.RegistrationID,
 			Email:          reg.Email,
 			VatID:          reg.VatID,
-			Error:          fmt.Sprintf("Welcome email error: %v", err.Error()),
+			Type:           "error",
+			Message:        fmt.Sprintf("Welcome email error: %v", err.Error()),
 		})
 	} else {
 		slog.Info("📧 Welcome email sent", "email", reg.Email)
@@ -332,17 +371,20 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("❌ Error updating TM Forum", "error", err)
 		// Record the error in the database
-		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
+		_ = s.DB.SaveRegistrationLog(&db.RegistrationLog{
 			RegistrationID: reg.RegistrationID,
 			Email:          reg.Email,
 			VatID:          reg.VatID,
-			Error:          fmt.Sprintf("TM Forum update error: %v", err),
+			Type:           "error",
+			Message:        fmt.Sprintf("TM Forum update error: %v", err),
 		})
 	}
 
 	s.SendJSON(w, r, http.StatusOK, true, "Registration successful", nil)
 }
 
+// saveToDB converts a RegistrationRequest received from the API to a database RegistrationRecord and saves it to the database.
+// It assumes that the request data has been validated
 func saveToDB(requestData RegistrationRequest, s *Server) (*db.RegistrationRecord, error) {
 	regID := generateRegistrationID()
 	reg := &db.RegistrationRecord{
@@ -371,8 +413,8 @@ func saveToDB(requestData RegistrationRequest, s *Server) (*db.RegistrationRecor
 
 func performIssuance(token string, reg *db.RegistrationRecord, s *Server, requestData RegistrationRequest) error {
 
-	// Create the struct needed by the Issuer API
-	cred := &credissuance.LEARIssuanceRequestBody{
+	// Create the struct needed by the Issuer API for a credential for the self-registration
+	soloCredential := &credissuance.LEARIssuanceRequestBody{
 		Schema:        "LEARCredentialEmployee",
 		OperationMode: "S",
 		Format:        "jwt_vc_json",
@@ -395,25 +437,32 @@ func performIssuance(token string, reg *db.RegistrationRecord, s *Server, reques
 					Type:     "domain",
 					Domain:   "DOME",
 					Function: "Onboarding",
-					Action:   credissuance.Strings{"execute", "verify"},
+					Action:   credissuance.Strings{"Execute"},
+				},
+				{
+					Type:     "domain",
+					Domain:   "DOME",
+					Function: "ProductOffering",
+					Action:   credissuance.Strings{"Create", "Update", "Delete"},
 				},
 			},
 		},
 	}
 
-	if _, err := s.Issuer.LEARIssuanceRequest(token, cred); err != nil {
+	if _, err := s.Issuer.LEARIssuanceRequest(token, soloCredential); err != nil {
 		slog.Error("❌ Error calling issuance service", "error", err)
 
 		// Record the error in the database
-		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
+		_ = s.DB.SaveRegistrationLog(&db.RegistrationLog{
 			RegistrationID: reg.RegistrationID,
 			Email:          reg.Email,
 			VatID:          reg.VatID,
-			Error:          fmt.Sprintf("Issuance error (in performIssuance): %v", err),
+			Type:           "error",
+			Message:        fmt.Sprintf("Issuance error (in performIssuance): %v", err),
 		})
 
 		// Format the information we sent to the Issuer
-		buf, errformat := json.MarshalIndent(cred, "", "  ")
+		buf, errformat := json.MarshalIndent(soloCredential, "", "  ")
 		if errformat != nil {
 			slog.Error("❌ Error marshalling credential data", "error", errformat)
 			buf = []byte("Error marshalling credential data")
@@ -456,11 +505,10 @@ func updateTMForum(token string, requestData RegistrationRequest, reg *db.Regist
 		err = errl.Errorf("Failed to create organization for registration: %v", err)
 		slog.Error("❌ Error creating organization", "error", err)
 		// Record the error in the database
-		_ = s.DB.SaveRegistrationError(&db.RegistrationError{
+		_ = s.DB.SaveRegistrationLog(&db.RegistrationLog{
 			RegistrationID: reg.RegistrationID,
-			Email:          reg.Email,
-			VatID:          reg.VatID,
-			Error:          fmt.Sprintf("TM Forum create organization error: %v", err),
+			Type:           "error",
+			Message:        fmt.Sprintf("TM Forum create organization error: %v", err),
 		})
 		return err
 	}

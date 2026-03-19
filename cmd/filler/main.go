@@ -72,13 +72,14 @@ func main() {
 			// Add random number of errors
 			numErrors := (i % 2) + 1
 			for j := 1; j <= numErrors; j++ {
-				regErr := &db.RegistrationError{
+				logEntry := &db.RegistrationLog{
 					RegistrationID: regID,
 					Email:          email,
 					VatID:          vatID,
-					Error:          fmt.Sprintf("Sample error %d during processing for user %d", j, i),
+					Type:           "error",
+					Message:        fmt.Sprintf("Sample error %d during processing for user %d", j, i),
 				}
-				_ = dbService.SaveRegistrationError(regErr)
+				_ = dbService.SaveRegistrationLog(logEntry)
 			}
 		}
 

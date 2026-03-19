@@ -108,8 +108,8 @@ func TestRegistrationConstraints(t *testing.T) {
 	}
 }
 
-func TestRegistrationErrors(t *testing.T) {
-	dbPath := "data/onboarding_errors_test.db"
+func TestRegistrationLogs(t *testing.T) {
+	dbPath := "data/onboarding_logs_test.db"
 	os.Remove(dbPath) // Start fresh
 	defer os.Remove(dbPath)
 
@@ -119,27 +119,27 @@ func TestRegistrationErrors(t *testing.T) {
 	}
 	defer svc.Close()
 
-	errEntry := &RegistrationError{
-		RegistrationID: "reg-err-001",
-		Email:          "error@example.com",
-		VatID:          "VAT_ERR_1",
-		Error:          "Something went wrong",
+	logEntry := &RegistrationLog{
+		RegistrationID: "reg-log-001",
+		Email:          "log@example.com",
+		VatID:          "VAT_LOG_1",
+		Type:           "info",
+		Message:        "Something informative",
 	}
 
-	if err := svc.SaveRegistrationError(errEntry); err != nil {
-		t.Fatalf("failed to save registration error: %v", err)
+	if err := svc.SaveRegistrationLog(logEntry); err != nil {
+		t.Fatalf("failed to save registration log: %v", err)
 	}
 
-	// Verify that the error was saved by manually querying the (private) connection
-	// Since we don't have a GetRegistrationErrors method yet, we use a raw query
+	// Verify that the log was saved by manually querying the (private) connection
 	var count int
-	err = svc.conn.QueryRow("SELECT COUNT(*) FROM registration_errors WHERE registration_id = ?", "reg-err-001").Scan(&count)
+	err = svc.conn.QueryRow("SELECT COUNT(*) FROM registration_log WHERE registration_id = ?", "reg-log-001").Scan(&count)
 	if err != nil {
-		t.Fatalf("failed to query registration errors: %v", err)
+		t.Fatalf("failed to query registration logs: %v", err)
 	}
 
 	if count != 1 {
-		t.Errorf("expected 1 registration error, got %d", count)
+		t.Errorf("expected 1 registration log, got %d", count)
 	}
 }
 

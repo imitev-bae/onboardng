@@ -26,14 +26,14 @@ func TestHandleValidateEmail(t *testing.T) {
 	t.Run("Method Not Allowed", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/validate-email", nil)
 		w := httptest.NewRecorder()
-		s.HandleValidateEmail(w, req)
+		s.HandleSendEmailValidationCode(w, req)
 		assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
 	})
 
 	t.Run("Missing CSRF Header", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/validate-email", nil)
 		w := httptest.NewRecorder()
-		s.HandleValidateEmail(w, req)
+		s.HandleSendEmailValidationCode(w, req)
 		assert.Equal(t, http.StatusForbidden, w.Code)
 	})
 
@@ -42,7 +42,7 @@ func TestHandleValidateEmail(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/validate-email", bytes.NewBuffer(body))
 		req.Header.Set("X-Requested-With", "XMLHttpRequest")
 		w := httptest.NewRecorder()
-		s.HandleValidateEmail(w, req)
+		s.HandleSendEmailValidationCode(w, req)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		var resp APIResponse
@@ -64,7 +64,7 @@ func TestHandleValidateEmail(t *testing.T) {
 			return nil
 		}
 
-		s.HandleValidateEmail(w, req)
+		s.HandleSendEmailValidationCode(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var resp APIResponse
@@ -96,7 +96,7 @@ func TestHandleVerifyCode(t *testing.T) {
 		req.Header.Set("X-Requested-With", "XMLHttpRequest")
 		w := httptest.NewRecorder()
 
-		s.HandleVerifyCode(w, req)
+		s.HandleValidateEmailCode(w, req)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
@@ -110,7 +110,7 @@ func TestHandleVerifyCode(t *testing.T) {
 		req.Header.Set("X-Requested-With", "XMLHttpRequest")
 		w := httptest.NewRecorder()
 
-		s.HandleVerifyCode(w, req)
+		s.HandleValidateEmailCode(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
 
@@ -125,21 +125,21 @@ func TestHandleVerifyCode(t *testing.T) {
 		req1 := httptest.NewRequest(http.MethodPost, "/api/verify-code", bytes.NewBuffer(wrongBody))
 		req1.Header.Set("X-Requested-With", "XMLHttpRequest")
 		w1 := httptest.NewRecorder()
-		s.HandleVerifyCode(w1, req1)
+		s.HandleValidateEmailCode(w1, req1)
 		assert.Equal(t, http.StatusBadRequest, w1.Code)
 
 		// 2nd attempt
 		req2 := httptest.NewRequest(http.MethodPost, "/api/verify-code", bytes.NewBuffer(wrongBody))
 		req2.Header.Set("X-Requested-With", "XMLHttpRequest")
 		w2 := httptest.NewRecorder()
-		s.HandleVerifyCode(w2, req2)
+		s.HandleValidateEmailCode(w2, req2)
 		assert.Equal(t, http.StatusBadRequest, w2.Code)
 
 		// 3rd attempt - should fail and delete the code
 		req3 := httptest.NewRequest(http.MethodPost, "/api/verify-code", bytes.NewBuffer(wrongBody))
 		req3.Header.Set("X-Requested-With", "XMLHttpRequest")
 		w3 := httptest.NewRecorder()
-		s.HandleVerifyCode(w3, req3)
+		s.HandleValidateEmailCode(w3, req3)
 		assert.Equal(t, http.StatusBadRequest, w3.Code)
 
 		// 4th attempt with CORRECT code - should fail because code was deleted
@@ -147,7 +147,7 @@ func TestHandleVerifyCode(t *testing.T) {
 		reqCorrect := httptest.NewRequest(http.MethodPost, "/api/verify-code", bytes.NewBuffer(correctBody))
 		reqCorrect.Header.Set("X-Requested-With", "XMLHttpRequest")
 		w4 := httptest.NewRecorder()
-		s.HandleVerifyCode(w4, reqCorrect)
+		s.HandleValidateEmailCode(w4, reqCorrect)
 		assert.Equal(t, http.StatusBadRequest, w4.Code)
 	})
 }
