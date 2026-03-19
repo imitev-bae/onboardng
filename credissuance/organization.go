@@ -635,3 +635,26 @@ func (l *LEARIssuance) TMFDeleteOrganization(accessToken string, id string) erro
 
 	return nil
 }
+
+func (l *LEARIssuance) TMFDeleteAllOrganizationsByELSI(accessToken string, elsi string) error {
+	// Check in the TMF server if the organization already exists.
+	// In PRO, we reject registration if the organization already exists.
+	// In other environments, we continue with the registration, deleting the existing orgs.
+	existingOrgs, _ := l.TMFGetOrganizationByELSI(accessToken, elsi)
+	if len(existingOrgs) > 0 {
+		slog.Info("Organization already exists in TMF server", "vatId", elsi)
+
+		// Delete all the organizations from the TMF server
+		for _, org := range existingOrgs {
+			if err := l.TMFDeleteOrganization(accessToken, org.ID); err != nil {
+				err = errl.Errorf("Failed to delete organization for registration: %v", err)
+				slog.Error("❌ Error deleting organization", "error", err)
+			}
+			slog.Info("Existing organization deleted from TM Forum server", "orgId", org.ID)
+		}
+
+	}
+
+	return nil
+
+}

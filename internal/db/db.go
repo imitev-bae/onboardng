@@ -32,12 +32,13 @@ type RegistrationRecord struct {
 	TMFRegistered  bool      `json:"tmf_registered"`
 }
 
-// RegistrationError represents an error during the registration process
-type RegistrationError struct {
+// RegistrationLog represents a log entry (info, warning, error) during the registration process
+type RegistrationLog struct {
 	RegistrationID string    `json:"registration_id"`
 	Email          string    `json:"email"`
 	VatID          string    `json:"vat_id"`
-	Error          string    `json:"error"`
+	Type           string    `json:"type"` // info, warning, error
+	Message        string    `json:"message"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -94,11 +95,12 @@ func NewService(runtime configuration.RuntimeEnv, path string) (*Service, error)
 		created_at DATETIME,
 		updated_at DATETIME
 	);
-	CREATE TABLE IF NOT EXISTS registration_errors (
+	CREATE TABLE IF NOT EXISTS registration_log (
 		registration_id TEXT,
 		email TEXT,
 		vat_id TEXT,
-		error TEXT,
+		type TEXT,
+		message TEXT,
 		created_at DATETIME
 	);
 	CREATE TABLE IF NOT EXISTS registration_files (
@@ -361,6 +363,32 @@ func (s *Service) GetRegistration(vatID string, email string) (*RegistrationReco
 	return &reg, nil
 }
 
+// GetRegistrationByEmailOrVatID returns a registration by email or VAT ID
+// It returns an error if the registration is not found under any of the provided identifiers
+func (s *Service) GetRegistrationByEmailOrVatID(email string, vatID string) (*RegistrationRecord, error) {
+	query := `
+	SELECT 
+		registration_id, email, first_name, last_name, company_name, country, vat_id,
+		street_address, postal_code,
+		created_at, updated_at, notified, issued, tmf_registered
+	FROM registrations
+	WHERE email = :email OR vat_id = :vat_id`
+
+	var reg RegistrationRecord
+	err := s.conn.QueryRow(query,
+		sql.Named("email", email),
+		sql.Named("vat_id", vatID),
+	).Scan(
+		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
+		&reg.StreetAddress, &reg.PostalCode,
+		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
+	)
+	if err != nil {
+		return nil, errl.Errorf("failed to get registration by email or VAT ID: %w", err)
+	}
+	return &reg, nil
+}
+
 func (s *Service) GetRegistrationByVatID(vatID string) (*RegistrationRecord, error) {
 	query := `
 	SELECT 
@@ -403,23 +431,24 @@ func (s *Service) GetRegistrationByEmail(email string) (*RegistrationRecord, err
 	return &reg, nil
 }
 
-func (s *Service) SaveRegistrationError(regErr *RegistrationError) error {
+func (s *Service) SaveRegistrationLog(logEntry *RegistrationLog) error {
 	query := `
-	INSERT INTO registration_errors (
-		registration_id, email, vat_id, error, created_at
-	) VALUES (:registration_id, :email, :vat_id, :error, :created_at)`
+	INSERT INTO registration_log (
+		registration_id, email, vat_id, type, message, created_at
+	) VALUES (:registration_id, :email, :vat_id, :type, :message, :created_at)`
 
-	regErr.CreatedAt = time.Now()
+	logEntry.CreatedAt = time.Now()
 
 	_, err := s.conn.Exec(query,
-		sql.Named("registration_id", regErr.RegistrationID),
-		sql.Named("email", regErr.Email),
-		sql.Named("vat_id", regErr.VatID),
-		sql.Named("error", regErr.Error),
-		sql.Named("created_at", regErr.CreatedAt),
+		sql.Named("registration_id", logEntry.RegistrationID),
+		sql.Named("email", logEntry.Email),
+		sql.Named("vat_id", logEntry.VatID),
+		sql.Named("type", logEntry.Type),
+		sql.Named("message", logEntry.Message),
+		sql.Named("created_at", logEntry.CreatedAt),
 	)
 	if err != nil {
-		return errl.Errorf("failed to insert registration error: %w", err)
+		return errl.Errorf("failed to insert registration log: %w", err)
 	}
 	return nil
 }
@@ -552,11 +581,11 @@ func (s *Service) UpdateRegistrationFileContent(fileID string, content []byte) e
 	return nil
 }
 
-func (s *Service) GetRegistrationErrors(limit, offset int) ([]RegistrationError, error) {
+func (s *Service) GetRegistrationLogs(limit, offset int) ([]RegistrationLog, error) {
 	query := `
 	SELECT 
-		registration_id, email, vat_id, error, created_at
-	FROM registration_errors
+		registration_id, email, vat_id, type, message, created_at
+	FROM registration_log
 	ORDER BY created_at DESC
 	LIMIT :limit OFFSET :offset`
 
@@ -565,27 +594,27 @@ func (s *Service) GetRegistrationErrors(limit, offset int) ([]RegistrationError,
 		sql.Named("offset", offset),
 	)
 	if err != nil {
-		return nil, errl.Errorf("failed to get registration errors: %w", err)
+		return nil, errl.Errorf("failed to get registration logs: %w", err)
 	}
 	defer rows.Close()
 
-	var errorsList []RegistrationError
+	var logsList []RegistrationLog
 	for rows.Next() {
-		var e RegistrationError
+		var l RegistrationLog
 		err := rows.Scan(
-			&e.RegistrationID, &e.Email, &e.VatID, &e.Error, &e.CreatedAt,
+			&l.RegistrationID, &l.Email, &l.VatID, &l.Type, &l.Message, &l.CreatedAt,
 		)
 		if err != nil {
-			return nil, errl.Errorf("failed to scan registration error row: %w", err)
+			return nil, errl.Errorf("failed to scan registration log row: %w", err)
 		}
-		errorsList = append(errorsList, e)
+		logsList = append(logsList, l)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, errl.Errorf("failed to iterate over registration error rows: %w", err)
+		return nil, errl.Errorf("failed to iterate over registration log rows: %w", err)
 	}
 
-	return errorsList, nil
+	return logsList, nil
 }
 
 func (s *Service) GetRegistrationFiles(limit, offset int) ([]RegistrationFile, error) {

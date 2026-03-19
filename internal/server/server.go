@@ -13,24 +13,28 @@ import (
 	"github.com/hesusruiz/onboardng/internal/db"
 )
 
+// DBServiceProvider enables easy testing or replacing of the database implementation
 type DBServiceProvider interface {
 	SaveRegistration(reg *db.RegistrationRecord) error
 	UpdateRegistrationStatus(reg *db.RegistrationRecord) error
-	SaveRegistrationError(regErr *db.RegistrationError) error
+	SaveRegistrationLog(logEntry *db.RegistrationLog) error
 	GetRegistrationByVatID(vatID string) (*db.RegistrationRecord, error)
 	GetRegistrationByEmail(email string) (*db.RegistrationRecord, error)
+	GetRegistrationByEmailOrVatID(email string, vatID string) (*db.RegistrationRecord, error)
 	GetRegistrations(limit, offset int) ([]db.RegistrationRecord, error)
-	GetRegistrationErrors(limit, offset int) ([]db.RegistrationError, error)
+	GetRegistrationLogs(limit, offset int) ([]db.RegistrationLog, error)
 	GetRegistrationFiles(limit, offset int) ([]db.RegistrationFile, error)
 	GetRegistrationFile(fileID string) (*db.RegistrationFile, error)
 }
 
+// MailServiceProvider enables easy testing or replacing of the mail implementation
 type MailServiceProvider interface {
 	SendVerificationCode(email string, code string) error
 	SendWelcomeEmail(reg *db.RegistrationRecord) error
 	SendIssuerError(reg *db.RegistrationRecord, payload string, errorMsg string) error
 }
 
+// IssuanceServiceProvider enables easy testing or replacing of the issuance implementation
 type IssuanceServiceProvider interface {
 	GetAccessToken() (string, error)
 	TMFGetOrganizationByELSI(accessToken string, elsi string) ([]credissuance.Organization, error)
@@ -92,13 +96,13 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	mux.Handle("/admin/", http.StripPrefix("/admin/", adminFileServer))
 
 	// API Routes
-	mux.HandleFunc("/api/validate-email", s.LogRequest(s.EnableCORS(s.RateLimitIP(s.HandleValidateEmail))))
-	mux.HandleFunc("/api/verify-code", s.LogRequest(s.EnableCORS(s.HandleVerifyCode)))
+	mux.HandleFunc("/api/validate-email", s.LogRequest(s.EnableCORS(s.RateLimitIP(s.HandleSendEmailValidationCode))))
+	mux.HandleFunc("/api/verify-code", s.LogRequest(s.EnableCORS(s.HandleValidateEmailCode)))
 	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
 	mux.HandleFunc("/health", s.HandleHealth)
 
 	mux.HandleFunc("/api/admin/registrations", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrations)))
-	mux.HandleFunc("/api/admin/registration-errors", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationErrors)))
+	mux.HandleFunc("/api/admin/registration-logs", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationLogs)))
 	mux.HandleFunc("/api/admin/registration-files", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrationFiles)))
 	mux.HandleFunc("/api/admin/file/", s.LogRequest(s.EnableCORS(s.HandleAdminGetFile)))
 

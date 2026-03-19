@@ -35,8 +35,8 @@ func (s *Server) HandleAdminGetRegistrations(w http.ResponseWriter, r *http.Requ
 	s.SendJSON(w, r, http.StatusOK, true, "Registrations fetched successfully", regs)
 }
 
-// HandleAdminGetRegistrationErrors returns the list of registration errors
-func (s *Server) HandleAdminGetRegistrationErrors(w http.ResponseWriter, r *http.Request) {
+// HandleAdminGetRegistrationLogs returns the list of registration logs
+func (s *Server) HandleAdminGetRegistrationLogs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -56,13 +56,13 @@ func (s *Server) HandleAdminGetRegistrationErrors(w http.ResponseWriter, r *http
 		}
 	}
 
-	errorsList, err := s.DB.GetRegistrationErrors(limit, offset)
+	logsList, err := s.DB.GetRegistrationLogs(limit, offset)
 	if err != nil {
-		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error fetching registration errors", err.Error())
+		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error fetching registration logs", err.Error())
 		return
 	}
 
-	s.SendJSON(w, r, http.StatusOK, true, "Registration errors fetched successfully", errorsList)
+	s.SendJSON(w, r, http.StatusOK, true, "Registration logs fetched successfully", logsList)
 }
 
 // HandleAdminGetRegistrationFiles returns the list of registration files
