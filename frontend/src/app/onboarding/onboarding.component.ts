@@ -1,6 +1,7 @@
 import { Component, ViewEncapsulation, inject, ChangeDetectorRef } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { finalize } from 'rxjs';
 import { LandingComponent } from './components/landing/landing.component';
 import { TermsComponent } from './components/terms/terms.component';
 import { RepresentativeComponent } from './components/representative/representative.component';
@@ -31,6 +32,8 @@ export class OnboardingComponent {
   worldCountries = WORLD_COUNTRIES;
   currentStep = 0;
   showVerificationModal = false;
+  showAlreadyRegisteredModal = false;
+  showCompanyRegisteredModal = false;
   isValidatingEmail = false;
   emailError = '';
   isVerifyingCode = false;
@@ -85,6 +88,10 @@ export class OnboardingComponent {
   goBackToRepresentative(): void {
     this.verifiedCode = '';
     this.currentStep = 2;
+    this.isRegistering = false;
+    this.registerError = '';
+    this.showCompanyRegisteredModal = false;
+    this.showAlreadyRegisteredModal = false;
   }
 
   validateEmailAndNext(): void {
@@ -98,6 +105,10 @@ export class OnboardingComponent {
     });
 
     this.http.post<any>('/api/validate-email', { email }, { headers })
+      .pipe(finalize(() => {
+        this.isValidatingEmail = false;
+        this.cdr.detectChanges();
+      }))
       .subscribe({
         next: (res: any) => {
           this.isValidatingEmail = false;
@@ -119,6 +130,8 @@ export class OnboardingComponent {
   onEditEmail(): void {
     this.showVerificationModal = false;
     this.verifyError = '';
+    this.isValidatingEmail = false;
+    this.emailError = '';
   }
 
   onVerify(code: string): void {
@@ -138,6 +151,15 @@ export class OnboardingComponent {
           if (res && res.success === true) {
             this.verifiedCode = code;
             this.showVerificationModal = false;
+            const d = res.data;
+            this.companyGroup.patchValue({
+              legalName: d?.companyName || '',
+              vatNumber: d?.vatId || '',
+              country: d?.country || '',
+              city: d?.city || '',
+              street: d?.streetAddress || '',
+              postalCode: d?.postalCode || '',
+            });
             this.currentStep = 4;
           } else {
             this.verifyError = res?.message || 'Invalid verification code. Please try again.';
@@ -189,12 +211,17 @@ export class OnboardingComponent {
       companyName: company.legalName,
       vatId: company.vatNumber,
       country: company.country,
+      city: company.city,
       streetAddress: company.street,
       postalCode: company.postalCode,
       code: this.verifiedCode,
     };
 
     this.http.post<any>('/api/register', body, { headers })
+      .pipe(finalize(() => {
+        this.isRegistering = false;
+        this.cdr.detectChanges();
+      }))
       .subscribe({
         next: (res: any) => {
           this.isRegistering = false;
@@ -207,7 +234,14 @@ export class OnboardingComponent {
         },
         error: (err: any) => {
           this.isRegistering = false;
-          this.registerError = err.error?.message || 'Registration failed. Please try again.';
+          const message: string = err.error?.message || '';
+          if (message.toLowerCase().includes('email already registered')) {
+            this.showAlreadyRegisteredModal = true;
+          } else if (message.toLowerCase().includes('company already registered')) {
+            this.showCompanyRegisteredModal = true;
+          } else {
+            this.registerError = message || 'Registration failed. Please try again.';
+          }
           this.cdr.detectChanges();
         }
       });

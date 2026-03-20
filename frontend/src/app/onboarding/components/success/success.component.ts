@@ -1,5 +1,4 @@
 import { Component, ViewEncapsulation } from '@angular/core';
-import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-success',
@@ -9,9 +8,7 @@ import { Router } from '@angular/router';
   encapsulation: ViewEncapsulation.None
 })
 export class SuccessComponent {
-  constructor(private router: Router) {}
-
   goHome(): void {
-    this.router.navigate(['/dashboard']);
+    window.location.href = 'https://dome-marketplace-sbx.org/';
   }
 }
