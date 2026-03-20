@@ -16,6 +16,6 @@ export class ProviderSuccessComponent {
   }
 
   goHome(): void {
-    this.router.navigate(['/dashboard']);
+    window.location.href = 'https://dome-marketplace-sbx.org/';
   }
 }

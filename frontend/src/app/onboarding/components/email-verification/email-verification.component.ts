@@ -55,6 +55,8 @@ export class EmailVerificationComponent implements OnDestroy {
     if (event.key === 'Backspace' && !this.otpDigits[index] && index > 0) {
       const inputs = this.otpInputs.toArray();
       inputs[index - 1].nativeElement.focus();
+    } else if (event.key === 'Enter') {
+      this.onVerify();
     }
   }
 
