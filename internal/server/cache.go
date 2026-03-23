@@ -83,10 +83,10 @@ func (s *Server) DeleteVerificationCode(email string) {
 	delete(s.VerificationCodes, email)
 }
 
-// cleanupExpired removes entries older than 15 minutes from the in-memory caches.
+// cleanupExpired removes entries older than 1 hour from the in-memory caches.
 func (s *Server) cleanupExpired() {
 	now := time.Now()
-	expirationLimit := 15 * time.Minute
+	expirationLimit := 1 * time.Hour
 
 	// Cleanup EmailRateLimiter
 	s.RateLimiterMu.Lock()

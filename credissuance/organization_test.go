@@ -16,7 +16,7 @@ func TestOrganizationAPI(t *testing.T) {
 		}
 
 		switch r.URL.Path {
-		case "/organization":
+		case "/tmf-api/party/v4/organization":
 			if r.Method == "GET" {
 				orgs := []Organization{{ID: "1", Name: "Org 1"}}
 				json.NewEncoder(w).Encode(orgs)
@@ -27,7 +27,7 @@ func TestOrganizationAPI(t *testing.T) {
 				w.WriteHeader(http.StatusCreated)
 				json.NewEncoder(w).Encode(org)
 			}
-		case "/organization/1":
+		case "/tmf-api/party/v4/organization/1":
 			if r.Method == "GET" {
 				org := Organization{ID: "1", Name: "Org 1"}
 				json.NewEncoder(w).Encode(org)
@@ -48,6 +48,7 @@ func TestOrganizationAPI(t *testing.T) {
 	// Create a dummy LEARIssuance instance
 	l := &LEARIssuance{
 		verifierURL: server.URL,
+		tmForumURL:  server.URL,
 	}
 
 	// Token
@@ -112,7 +113,7 @@ func TestOrganizationAPI(t *testing.T) {
 		}))
 		defer serverEmpty.Close()
 
-		lEmpty := &LEARIssuance{verifierURL: serverEmpty.URL}
+		lEmpty := &LEARIssuance{verifierURL: serverEmpty.URL, tmForumURL: serverEmpty.URL}
 		err := lEmpty.TMFDeleteOrganization("", "1")
 		if err != nil {
 			t.Fatalf("DeleteOrganization failed: %v", err)

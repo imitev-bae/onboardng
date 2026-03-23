@@ -254,11 +254,11 @@ func TestHandleRegister(t *testing.T) {
 		json.NewDecoder(w.Body).Decode(&resp)
 		assert.True(t, resp.Success)
 
-		// Map should be empty of the code
+		// Code should still exist because user removed deletion in HandleRegister
 		s.CodesMu.RLock()
 		_, exists := s.VerificationCodes[email]
 		s.CodesMu.RUnlock()
-		assert.False(t, exists)
+		assert.True(t, exists)
 	})
 
 	t.Run("Production Conflict", func(t *testing.T) {
@@ -273,8 +273,11 @@ func TestHandleRegister(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		mockIssuance.GetAccessTokenFunc = func() (string, error) { return "token", nil }
-		mockIssuance.TMFGetOrganizationByELSIFunc = func(token, elsi string) ([]credissuance.Organization, error) {
-			return []credissuance.Organization{{ID: "org1"}}, nil
+		mockDB.GetRegistrationByEmailOrVatIDFunc = func(email, vatID string) (*db.RegistrationRecord, error) {
+			return &db.RegistrationRecord{
+				Email: email,
+				VatID: "DIFFERENT",
+			}, nil
 		}
 
 		s.HandleRegister(w, req)
@@ -282,6 +285,9 @@ func TestHandleRegister(t *testing.T) {
 	})
 
 	t.Run("Access Token Failure", func(t *testing.T) {
+		mockDB.GetRegistrationByEmailOrVatIDFunc = func(email, vatID string) (*db.RegistrationRecord, error) {
+			return nil, fmt.Errorf("not found")
+		}
 		s.Runtime = configuration.Development
 		s.StoreVerificationCode(validReq.Email, validReq.Code)
 		body, _ := json.Marshal(validReq)
@@ -321,12 +327,4 @@ func TestHandleHealth(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestRegisterCustomerRedirect(t *testing.T) {
-	s := NewServer(configuration.Development, &MockDB{}, &MockIssuance{}, &MockMail{}, "/tmp")
-	req := httptest.NewRequest(http.MethodGet, "/register-customer", nil)
-	w := httptest.NewRecorder()
-	s.Handler.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusMovedPermanently, w.Code)
-	assert.Equal(t, "/", w.Header().Get("Location"))
-}

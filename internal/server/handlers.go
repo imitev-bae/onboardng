@@ -37,6 +37,7 @@ type RegistrationRequest struct {
 	Email         string `json:"email"`
 	Code          string `json:"code"`
 	Website       string `json:"website"`
+	Role          string `json:"role"`
 }
 
 // SendJSON utility helper
@@ -264,6 +265,10 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if requestData.Role == "" {
+		requestData.Role = "Buyer"
+	}
+
 	// Verify the code again to prevent spurious calls
 	if !s.VerifyCode(requestData.Email, requestData.Code) {
 		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
@@ -291,8 +296,6 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	s.DeleteVerificationCode(requestData.Email)
 
 	// Get an access token to authenticate in the Issuer and TM Forum APIs
 	token, err := s.Issuer.GetAccessToken()
@@ -410,6 +413,7 @@ func saveToDB(requestData RegistrationRequest, s *Server) (*db.RegistrationRecor
 		StreetAddress:  requestData.StreetAddress,
 		City:           requestData.City,
 		PostalCode:     requestData.PostalCode,
+		Role:           requestData.Role,
 	}
 
 	// Create an initial registration in the database, updated with error and status later
@@ -563,4 +567,108 @@ func updateTMForumOrganization(token string, id string, requestData Registration
 		slog.Error("❌ Error updating registration status with TMF success", "error", err)
 	}
 	return nil
+}
+
+// RepresentativesRequest payload for updating LR and LEAR details
+type RepresentativesRequest struct {
+	VatID            string `json:"vatId"`
+	Email            string `json:"email"`
+	Code             string `json:"code"`
+	LRFirstName      string `json:"lrFirstName"`
+	LRLastName       string `json:"lrLastName"`
+	LREmail          string `json:"lrEmail"`
+	LRCountry        string `json:"lrCountry"`
+	LRIdCard         string `json:"lrIdCard"`
+	LEARFirstName    string `json:"learFirstName"`
+	LEARLastName     string `json:"learLastName"`
+	LEAREmail        string `json:"learEmail"`
+	LEARCountry      string `json:"learCountry"`
+	LEARAddress      string `json:"learAddress"`
+	LEARIdCard       string `json:"learIdCard"`
+	LEARMobileNumber string `json:"learMobileNumber"`
+	LEARCompleted    bool   `json:"learCompleted"`
+}
+
+// HandleUpdateRepresentatives handles updating the LR and LEAR info
+func (s *Server) HandleUpdateRepresentatives(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !validateCSRF(r) {
+		s.SendJSON(w, r, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
+		return
+	}
+
+	var req RepresentativesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid request body", nil)
+		return
+	}
+
+	if req.VatID == "" {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "VAT ID is required", nil)
+		return
+	}
+	if req.Email == "" {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Email is required", nil)
+		return
+	}
+	if req.Code == "" {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Verification code is required", nil)
+		return
+	}
+
+	// Verify the code
+	if !s.VerifyCode(req.Email, req.Code) {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
+		return
+	}
+
+	// Delete verification code after successful use. In any case, it will expire in 1 hour.
+	s.DeleteVerificationCode(req.Email)
+
+	// Fetch registration and check if immutable
+	current, err := s.DB.GetRegistrationByVatID(req.VatID)
+	if err != nil {
+		s.SendJSON(w, r, http.StatusNotFound, false, "Registration not found", nil)
+		return
+	}
+	// Check if the email matches the registration email
+	if current.Email != strings.ToLower(req.Email) {
+		s.SendJSON(w, r, http.StatusForbidden, false, "Email does not match the registration", nil)
+		return
+	}
+	if current.Approved {
+		s.SendJSON(w, r, http.StatusForbidden, false, "Registration is already approved and immutable", nil)
+		return
+	}
+
+	// Update DB
+	repParams := &db.RegistrationRecord{
+		LRFirstName:      req.LRFirstName,
+		LRLastName:       req.LRLastName,
+		LREmail:          req.LREmail,
+		LRCountry:        req.LRCountry,
+		LRIdCard:         req.LRIdCard,
+		LEARFirstName:    req.LEARFirstName,
+		LEARLastName:     req.LEARLastName,
+		LEAREmail:        req.LEAREmail,
+		LEARCountry:      req.LEARCountry,
+		LEARAddress:      req.LEARAddress,
+		LEARIdCard:       req.LEARIdCard,
+		LEARMobileNumber: req.LEARMobileNumber,
+		LEARCompleted:    req.LEARCompleted,
+		Role:             "Seller",
+	}
+
+	err = s.DB.UpdateRepresentativesByVatID(req.VatID, repParams)
+	if err != nil {
+		slog.Error("❌ Error updating representatives", "error", err)
+		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error updating registration", err.Error())
+		return
+	}
+
+	s.SendJSON(w, r, http.StatusOK, true, "Representatives updated successfully", nil)
 }

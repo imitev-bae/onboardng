@@ -26,11 +26,33 @@ type RegistrationRecord struct {
 	StreetAddress  string    `json:"street_address"`
 	City           string    `json:"city"`
 	PostalCode     string    `json:"postal_code"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	Notified       bool      `json:"notified"`
-	Issued         bool      `json:"issued"`
-	TMFRegistered  bool      `json:"tmf_registered"`
+	Role           string    `json:"role"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Notified      bool      `json:"notified"`
+	Issued        bool      `json:"issued"`
+	TMFRegistered bool      `json:"tmf_registered"`
+
+	// Legal Representative
+	LRFirstName string `json:"lr_first_name"`
+	LRLastName  string `json:"lr_last_name"`
+	LREmail     string `json:"lr_email"`
+	LRCountry   string `json:"lr_country"`
+	LRIdCard    string `json:"lr_id_card"`
+
+	// LEAR
+	LEARFirstName    string `json:"lear_first_name"`
+	LEARLastName     string `json:"lear_last_name"`
+	LEAREmail        string `json:"lear_email"`
+	LEARCountry      string `json:"lear_country"`
+	LEARAddress      string `json:"lear_address"`
+	LEARIdCard       string `json:"lear_id_card"`
+	LEARMobileNumber string `json:"lear_mobile_number"`
+
+	// State
+	LEARCompleted bool `json:"lear_completed"`
+	FilesUploaded bool `json:"files_uploaded"`
+	Approved      bool `json:"approved"`
 }
 
 // RegistrationLog represents a log entry (info, warning, error) during the registration process
@@ -78,6 +100,19 @@ func NewService(runtime configuration.RuntimeEnv, path string) (*Service, error)
 		return nil, errl.Errorf("failed to open database: %w", err)
 	}
 
+	// TODO: add the fields to store the info for the second step of onboarding:
+	// For Legal Representative:
+	// - required fields: lr_first_name, lr_last_name, lr_email, lr_country
+	// - optional fields: lr_id_card
+	// For LEAR (Legal Entity Authorized Representative):
+	// - required fields: lear_first_name, lear_last_name, lear_email, lear_country
+	// - optional fields: lear_address, lear_id_card, lear_mobile_number
+	//
+	// Also, add the fields to record the completion of sub-steps for this onboarding step:
+	// - lear_completed (boolean), implies also lr_completed, as they are updated at the same time
+	// - files_uploaded (boolean), as soon as the first file is uploaded
+	// - approved (boolean), as soon as the whole process is approved, which will be done by an admin manually
+
 	// Create table if not exists
 	query := `
 	CREATE TABLE IF NOT EXISTS registrations (
@@ -91,11 +126,27 @@ func NewService(runtime configuration.RuntimeEnv, path string) (*Service, error)
 		street_address TEXT,
 		city TEXT,
 		postal_code TEXT,
+		role TEXT,
 		notified BOOLEAN,
 		issued BOOLEAN,
 		tmf_registered BOOLEAN,
 		created_at DATETIME,
-		updated_at DATETIME
+		updated_at DATETIME,
+		lr_first_name TEXT,
+		lr_last_name TEXT,
+		lr_email TEXT,
+		lr_country TEXT,
+		lr_id_card TEXT,
+		lear_first_name TEXT,
+		lear_last_name TEXT,
+		lear_email TEXT,
+		lear_country TEXT,
+		lear_address TEXT,
+		lear_id_card TEXT,
+		lear_mobile_number TEXT,
+		lear_completed BOOLEAN,
+		files_uploaded BOOLEAN,
+		approved BOOLEAN
 	);
 	CREATE TABLE IF NOT EXISTS registration_log (
 		registration_id TEXT,
@@ -135,12 +186,18 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 	insertQuery := `
 	INSERT INTO registrations (
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, city, postal_code,
-		created_at, updated_at, notified, issued, tmf_registered
+		street_address, city, postal_code, role,
+		created_at, updated_at, notified, issued, tmf_registered,
+		lr_first_name, lr_last_name, lr_email, lr_country, lr_id_card,
+		lear_first_name, lear_last_name, lear_email, lear_country, lear_address, lear_id_card, lear_mobile_number,
+		lear_completed, files_uploaded, approved
 	) VALUES (
 		:registration_id, :email, :first_name, :last_name, :company_name, :country, :vat_id,
-		:street_address, :city, :postal_code,
-		:created_at, :updated_at, :notified, :issued, :tmf_registered
+		:street_address, :city, :postal_code, :role,
+		:created_at, :updated_at, :notified, :issued, :tmf_registered,
+		:lr_first_name, :lr_last_name, :lr_email, :lr_country, :lr_id_card,
+		:lear_first_name, :lear_last_name, :lear_email, :lear_country, :lear_address, :lear_id_card, :lear_mobile_number,
+		:lear_completed, :files_uploaded, :approved
 	)`
 
 	now := time.Now()
@@ -186,11 +243,27 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 			sql.Named("street_address", reg.StreetAddress),
 			sql.Named("city", reg.City),
 			sql.Named("postal_code", reg.PostalCode),
+			sql.Named("role", reg.Role),
 			sql.Named("created_at", reg.CreatedAt),
 			sql.Named("updated_at", reg.UpdatedAt),
 			sql.Named("notified", reg.Notified),
 			sql.Named("issued", reg.Issued),
 			sql.Named("tmf_registered", reg.TMFRegistered),
+			sql.Named("lr_first_name", reg.LRFirstName),
+			sql.Named("lr_last_name", reg.LRLastName),
+			sql.Named("lr_email", reg.LREmail),
+			sql.Named("lr_country", reg.LRCountry),
+			sql.Named("lr_id_card", reg.LRIdCard),
+			sql.Named("lear_first_name", reg.LEARFirstName),
+			sql.Named("lear_last_name", reg.LEARLastName),
+			sql.Named("lear_email", reg.LEAREmail),
+			sql.Named("lear_country", reg.LEARCountry),
+			sql.Named("lear_address", reg.LEARAddress),
+			sql.Named("lear_id_card", reg.LEARIdCard),
+			sql.Named("lear_mobile_number", reg.LEARMobileNumber),
+			sql.Named("lear_completed", reg.LEARCompleted),
+			sql.Named("files_uploaded", reg.FilesUploaded),
+			sql.Named("approved", reg.Approved),
 		)
 		if err != nil {
 			return errl.Errorf("failed to insert registration: %w", err)
@@ -226,11 +299,27 @@ func (s *Service) SaveRegistration(reg *RegistrationRecord) error {
 			sql.Named("street_address", reg.StreetAddress),
 			sql.Named("city", reg.City),
 			sql.Named("postal_code", reg.PostalCode),
+			sql.Named("role", reg.Role),
 			sql.Named("created_at", reg.CreatedAt),
 			sql.Named("updated_at", reg.UpdatedAt),
 			sql.Named("notified", reg.Notified),
 			sql.Named("issued", reg.Issued),
 			sql.Named("tmf_registered", reg.TMFRegistered),
+			sql.Named("lr_first_name", reg.LRFirstName),
+			sql.Named("lr_last_name", reg.LRLastName),
+			sql.Named("lr_email", reg.LREmail),
+			sql.Named("lr_country", reg.LRCountry),
+			sql.Named("lr_id_card", reg.LRIdCard),
+			sql.Named("lear_first_name", reg.LEARFirstName),
+			sql.Named("lear_last_name", reg.LEARLastName),
+			sql.Named("lear_email", reg.LEAREmail),
+			sql.Named("lear_country", reg.LEARCountry),
+			sql.Named("lear_address", reg.LEARAddress),
+			sql.Named("lear_id_card", reg.LEARIdCard),
+			sql.Named("lear_mobile_number", reg.LEARMobileNumber),
+			sql.Named("lear_completed", reg.LEARCompleted),
+			sql.Named("files_uploaded", reg.FilesUploaded),
+			sql.Named("approved", reg.Approved),
 		)
 		if err != nil {
 			return errl.Errorf("failed to insert registration: %w", err)
@@ -280,6 +369,7 @@ func (s *Service) AmendRegistration(reg *RegistrationRecord) error {
 		street_address = :street_address,
 		city = :city,
 		postal_code = :postal_code,
+		role = :role,
 		updated_at = :updated_at,
 		notified = :notified,
 		issued = :issued,
@@ -293,6 +383,7 @@ func (s *Service) AmendRegistration(reg *RegistrationRecord) error {
 		sql.Named("street_address", reg.StreetAddress),
 		sql.Named("city", reg.City),
 		sql.Named("postal_code", reg.PostalCode),
+		sql.Named("role", reg.Role),
 		sql.Named("updated_at", reg.UpdatedAt),
 		sql.Named("notified", reg.Notified),
 		sql.Named("issued", reg.Issued),
@@ -309,8 +400,11 @@ func (s *Service) GetRegistrations(limit, offset int) ([]RegistrationRecord, err
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, city, postal_code,
-		created_at, updated_at, notified, issued, tmf_registered
+		street_address, city, postal_code, role,
+		created_at, updated_at, notified, issued, tmf_registered,
+		lr_first_name, lr_last_name, lr_email, lr_country, lr_id_card,
+		lear_first_name, lear_last_name, lear_email, lear_country, lear_address, lear_id_card, lear_mobile_number,
+		lear_completed, files_uploaded, approved
 	FROM registrations
 	ORDER BY created_at DESC
 	LIMIT :limit OFFSET :offset`
@@ -329,8 +423,11 @@ func (s *Service) GetRegistrations(limit, offset int) ([]RegistrationRecord, err
 		var reg RegistrationRecord
 		err := rows.Scan(
 			&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-			&reg.StreetAddress, &reg.City, &reg.PostalCode,
+			&reg.StreetAddress, &reg.City, &reg.PostalCode, &reg.Role,
 			&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
+			&reg.LRFirstName, &reg.LRLastName, &reg.LREmail, &reg.LRCountry, &reg.LRIdCard,
+			&reg.LEARFirstName, &reg.LEARLastName, &reg.LEAREmail, &reg.LEARCountry, &reg.LEARAddress, &reg.LEARIdCard, &reg.LEARMobileNumber,
+			&reg.LEARCompleted, &reg.FilesUploaded, &reg.Approved,
 		)
 		if err != nil {
 			return nil, errl.Errorf("failed to scan registration row: %w", err)
@@ -349,8 +446,11 @@ func (s *Service) GetRegistration(vatID string, email string) (*RegistrationReco
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, city, postal_code,
-		created_at, updated_at, notified, issued, tmf_registered
+		street_address, city, postal_code, role,
+		created_at, updated_at, notified, issued, tmf_registered,
+		lr_first_name, lr_last_name, lr_email, lr_country, lr_id_card,
+		lear_first_name, lear_last_name, lear_email, lear_country, lear_address, lear_id_card, lear_mobile_number,
+		lear_completed, files_uploaded, approved
 	FROM registrations
 	WHERE vat_id = :vat_id AND email = :email`
 
@@ -360,8 +460,11 @@ func (s *Service) GetRegistration(vatID string, email string) (*RegistrationReco
 		sql.Named("email", email),
 	).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-		&reg.StreetAddress, &reg.City, &reg.PostalCode,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode, &reg.Role,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
+		&reg.LRFirstName, &reg.LRLastName, &reg.LREmail, &reg.LRCountry, &reg.LRIdCard,
+		&reg.LEARFirstName, &reg.LEARLastName, &reg.LEAREmail, &reg.LEARCountry, &reg.LEARAddress, &reg.LEARIdCard, &reg.LEARMobileNumber,
+		&reg.LEARCompleted, &reg.FilesUploaded, &reg.Approved,
 	)
 	if err != nil {
 		return nil, errl.Errorf("failed to get registration by VAT ID and email: %w", err)
@@ -375,8 +478,11 @@ func (s *Service) GetRegistrationByEmailOrVatID(email string, vatID string) (*Re
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, city, postal_code,
-		created_at, updated_at, notified, issued, tmf_registered
+		street_address, city, postal_code, role,
+		created_at, updated_at, notified, issued, tmf_registered,
+		lr_first_name, lr_last_name, lr_email, lr_country, lr_id_card,
+		lear_first_name, lear_last_name, lear_email, lear_country, lear_address, lear_id_card, lear_mobile_number,
+		lear_completed, files_uploaded, approved
 	FROM registrations
 	WHERE email = :email OR vat_id = :vat_id`
 
@@ -386,8 +492,11 @@ func (s *Service) GetRegistrationByEmailOrVatID(email string, vatID string) (*Re
 		sql.Named("vat_id", vatID),
 	).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-		&reg.StreetAddress, &reg.City, &reg.PostalCode,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode, &reg.Role,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
+		&reg.LRFirstName, &reg.LRLastName, &reg.LREmail, &reg.LRCountry, &reg.LRIdCard,
+		&reg.LEARFirstName, &reg.LEARLastName, &reg.LEAREmail, &reg.LEARCountry, &reg.LEARAddress, &reg.LEARIdCard, &reg.LEARMobileNumber,
+		&reg.LEARCompleted, &reg.FilesUploaded, &reg.Approved,
 	)
 	if err != nil {
 		return nil, errl.Errorf("failed to get registration by email or VAT ID: %w", err)
@@ -399,16 +508,22 @@ func (s *Service) GetRegistrationByVatID(vatID string) (*RegistrationRecord, err
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, city, postal_code,
-		created_at, updated_at, notified, issued, tmf_registered
+		street_address, city, postal_code, role,
+		created_at, updated_at, notified, issued, tmf_registered,
+		lr_first_name, lr_last_name, lr_email, lr_country, lr_id_card,
+		lear_first_name, lear_last_name, lear_email, lear_country, lear_address, lear_id_card, lear_mobile_number,
+		lear_completed, files_uploaded, approved
 	FROM registrations
 	WHERE vat_id = :vat_id`
 
 	var reg RegistrationRecord
 	err := s.conn.QueryRow(query, sql.Named("vat_id", vatID)).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-		&reg.StreetAddress, &reg.City, &reg.PostalCode,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode, &reg.Role,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
+		&reg.LRFirstName, &reg.LRLastName, &reg.LREmail, &reg.LRCountry, &reg.LRIdCard,
+		&reg.LEARFirstName, &reg.LEARLastName, &reg.LEAREmail, &reg.LEARCountry, &reg.LEARAddress, &reg.LEARIdCard, &reg.LEARMobileNumber,
+		&reg.LEARCompleted, &reg.FilesUploaded, &reg.Approved,
 	)
 	if err != nil {
 		return nil, errl.Errorf("failed to get registration by VAT ID: %w", err)
@@ -420,16 +535,22 @@ func (s *Service) GetRegistrationByEmail(email string) (*RegistrationRecord, err
 	query := `
 	SELECT 
 		registration_id, email, first_name, last_name, company_name, country, vat_id,
-		street_address, city, postal_code,
-		created_at, updated_at, notified, issued, tmf_registered
+		street_address, city, postal_code, role,
+		created_at, updated_at, notified, issued, tmf_registered,
+		lr_first_name, lr_last_name, lr_email, lr_country, lr_id_card,
+		lear_first_name, lear_last_name, lear_email, lear_country, lear_address, lear_id_card, lear_mobile_number,
+		lear_completed, files_uploaded, approved
 	FROM registrations
 	WHERE email = :email`
 
 	var reg RegistrationRecord
 	err := s.conn.QueryRow(query, sql.Named("email", email)).Scan(
 		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
-		&reg.StreetAddress, &reg.City, &reg.PostalCode,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode, &reg.Role,
 		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
+		&reg.LRFirstName, &reg.LRLastName, &reg.LREmail, &reg.LRCountry, &reg.LRIdCard,
+		&reg.LEARFirstName, &reg.LEARLastName, &reg.LEAREmail, &reg.LEARCountry, &reg.LEARAddress, &reg.LEARIdCard, &reg.LEARMobileNumber,
+		&reg.LEARCompleted, &reg.FilesUploaded, &reg.Approved,
 	)
 	if err != nil {
 		return nil, errl.Errorf("failed to get registration by email: %w", err)
@@ -657,4 +778,79 @@ func (s *Service) GetRegistrationFiles(limit, offset int) ([]RegistrationFile, e
 	}
 
 	return files, nil
+}
+
+// GetRegistrationByID returns a registration by its registration ID
+func (s *Service) GetRegistrationByID(registrationID string) (*RegistrationRecord, error) {
+	query := `
+	SELECT 
+		registration_id, email, first_name, last_name, company_name, country, vat_id,
+		street_address, city, postal_code,
+		created_at, updated_at, notified, issued, tmf_registered,
+		lr_first_name, lr_last_name, lr_email, lr_country, lr_id_card,
+		lear_first_name, lear_last_name, lear_email, lear_country, lear_address, lear_id_card, lear_mobile_number,
+		lear_completed, files_uploaded, approved
+	FROM registrations
+	WHERE registration_id = :registration_id`
+
+	var reg RegistrationRecord
+	err := s.conn.QueryRow(query, sql.Named("registration_id", registrationID)).Scan(
+		&reg.RegistrationID, &reg.Email, &reg.FirstName, &reg.LastName, &reg.CompanyName, &reg.Country, &reg.VatID,
+		&reg.StreetAddress, &reg.City, &reg.PostalCode,
+		&reg.CreatedAt, &reg.UpdatedAt, &reg.Notified, &reg.Issued, &reg.TMFRegistered,
+		&reg.LRFirstName, &reg.LRLastName, &reg.LREmail, &reg.LRCountry, &reg.LRIdCard,
+		&reg.LEARFirstName, &reg.LEARLastName, &reg.LEAREmail, &reg.LEARCountry, &reg.LEARAddress, &reg.LEARIdCard, &reg.LEARMobileNumber,
+		&reg.LEARCompleted, &reg.FilesUploaded, &reg.Approved,
+	)
+	if err != nil {
+		return nil, errl.Errorf("failed to get registration by ID: %w", err)
+	}
+	return &reg, nil
+}
+
+// UpdateRepresentativesByVatID updates the LR and LEAR fields of a registration by VAT ID.
+// The update is ignored by the database if the registration is already approved (approved = 0).
+func (s *Service) UpdateRepresentativesByVatID(vatID string, rep *RegistrationRecord) error {
+	query := `
+	UPDATE registrations SET
+		role = :role,
+		lr_first_name = :lr_first_name,
+		lr_last_name = :lr_last_name,
+		lr_email = :lr_email,
+		lr_country = :lr_country,
+		lr_id_card = :lr_id_card,
+		lear_first_name = :lear_first_name,
+		lear_last_name = :lear_last_name,
+		lear_email = :lear_email,
+		lear_country = :lear_country,
+		lear_address = :lear_address,
+		lear_id_card = :lear_id_card,
+		lear_mobile_number = :lear_mobile_number,
+		lear_completed = :lear_completed,
+		updated_at = :updated_at
+	WHERE vat_id = :vat_id AND approved = 0`
+
+	rep.UpdatedAt = time.Now()
+	_, err := s.conn.Exec(query,
+		sql.Named("role", rep.Role),
+		sql.Named("lr_first_name", rep.LRFirstName),
+		sql.Named("lr_last_name", rep.LRLastName),
+		sql.Named("lr_email", rep.LREmail),
+		sql.Named("lr_country", rep.LRCountry),
+		sql.Named("lr_id_card", rep.LRIdCard),
+		sql.Named("lear_first_name", rep.LEARFirstName),
+		sql.Named("lear_last_name", rep.LEARLastName),
+		sql.Named("lear_email", rep.LEAREmail),
+		sql.Named("lear_country", rep.LEARCountry),
+		sql.Named("lear_address", rep.LEARAddress),
+		sql.Named("lear_id_card", rep.LEARIdCard),
+		sql.Named("lear_mobile_number", rep.LEARMobileNumber),
+		sql.Named("lear_completed", rep.LEARCompleted),
+		sql.Named("updated_at", rep.UpdatedAt),
+		sql.Named("vat_id", vatID),
+	)
+	if err != nil {
+		return errl.Errorf("failed to update representatives: %w", err)
+	}
+	return nil
 }

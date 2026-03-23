@@ -25,6 +25,8 @@ type DBServiceProvider interface {
 	GetRegistrationLogs(limit, offset int) ([]db.RegistrationLog, error)
 	GetRegistrationFiles(limit, offset int) ([]db.RegistrationFile, error)
 	GetRegistrationFile(fileID string) (*db.RegistrationFile, error)
+	GetRegistrationByID(registrationID string) (*db.RegistrationRecord, error)
+	UpdateRepresentativesByVatID(vatID string, rep *db.RegistrationRecord) error
 }
 
 // MailServiceProvider enables easy testing or replacing of the mail implementation
@@ -100,6 +102,7 @@ func NewServer(runtime configuration.RuntimeEnv, dbService DBServiceProvider, is
 	mux.HandleFunc("/api/validate-email", s.LogRequest(s.EnableCORS(s.RateLimitIP(s.HandleSendEmailValidationCode))))
 	mux.HandleFunc("/api/verify-code", s.LogRequest(s.EnableCORS(s.HandleValidateEmailCode)))
 	mux.HandleFunc("/api/register", s.LogRequest(s.EnableCORS(s.HandleRegister)))
+	mux.HandleFunc("/api/representatives", s.LogRequest(s.EnableCORS(s.HandleUpdateRepresentatives)))
 	mux.HandleFunc("/health", s.HandleHealth)
 
 	mux.HandleFunc("/api/admin/registrations", s.LogRequest(s.EnableCORS(s.HandleAdminGetRegistrations)))
