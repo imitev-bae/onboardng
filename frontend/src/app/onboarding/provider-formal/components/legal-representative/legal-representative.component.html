@@ -19,8 +19,12 @@
           formControlName="firstName"
           class="w-full px-3 py-2.5 text-sm border rounded-lg bg-white focus:ring-primary-100 focus:border-primary-100"
           [ngClass]="formGroup.get('firstName')?.invalid && formGroup.get('firstName')?.touched ? 'border-[#AD1F36]' : 'border-gray-300'" />
-        @if (formGroup.get('firstName')?.invalid && formGroup.get('firstName')?.touched) {
-          <p class="text-xs mt-1" style="color: #AD1F36">This field is required</p>
+        @if (formGroup.get('firstName')?.touched) {
+          @if (formGroup.get('firstName')?.errors?.['required']) {
+            <p class="text-xs mt-1" style="color: #AD1F36">This field is required</p>
+          } @else if (formGroup.get('firstName')?.errors?.['latinOnly']) {
+            <p class="text-xs mt-1" style="color: #AD1F36">Only Latin alphabet characters are allowed</p>
+          }
         }
       </div>
       <div>
@@ -30,8 +34,12 @@
           formControlName="lastName"
           class="w-full px-3 py-2.5 text-sm border rounded-lg bg-white focus:ring-primary-100 focus:border-primary-100"
           [ngClass]="formGroup.get('lastName')?.invalid && formGroup.get('lastName')?.touched ? 'border-[#AD1F36]' : 'border-gray-300'" />
-        @if (formGroup.get('lastName')?.invalid && formGroup.get('lastName')?.touched) {
-          <p class="text-xs mt-1" style="color: #AD1F36">This field is required</p>
+        @if (formGroup.get('lastName')?.touched) {
+          @if (formGroup.get('lastName')?.errors?.['required']) {
+            <p class="text-xs mt-1" style="color: #AD1F36">This field is required</p>
+          } @else if (formGroup.get('lastName')?.errors?.['latinOnly']) {
+            <p class="text-xs mt-1" style="color: #AD1F36">Only Latin alphabet characters are allowed</p>
+          }
         }
       </div>
     </div>
@@ -62,7 +70,11 @@
         <input
           type="text"
           formControlName="idCardNumber"
-          class="w-full px-3 py-2.5 text-sm border rounded-lg bg-white border-gray-300 focus:ring-primary-100 focus:border-primary-100" />
+          class="w-full px-3 py-2.5 text-sm border rounded-lg bg-white focus:ring-primary-100 focus:border-primary-100"
+          [ngClass]="formGroup.get('idCardNumber')?.invalid && formGroup.get('idCardNumber')?.touched ? 'border-[#AD1F36]' : 'border-gray-300'" />
+        @if (formGroup.get('idCardNumber')?.errors?.['latinOnly'] && formGroup.get('idCardNumber')?.touched) {
+          <p class="text-xs mt-1" style="color: #AD1F36">Only Latin alphabet characters are allowed</p>
+        }
       </div>
     </div>
   </div>

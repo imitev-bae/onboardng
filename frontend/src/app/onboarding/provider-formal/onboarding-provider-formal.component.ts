@@ -1,5 +1,6 @@
 import { Component, ViewEncapsulation } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { latinOnly } from '../validators/latin-only.validator';
 import { FormalLandingComponent } from './components/landing/formal-landing.component';
 import { LegalRepresentativeComponent } from './components/legal-representative/legal-representative.component';
 import { LearComponent } from './components/lear/lear.component';
@@ -26,20 +27,20 @@ export class OnboardingProviderFormalComponent {
 
   formalForm = new FormGroup({
     legalRepresentative: new FormGroup({
-      firstName: new FormControl('', [Validators.required]),
-      lastName: new FormControl('', [Validators.required]),
+      firstName: new FormControl('', [Validators.required, latinOnly]),
+      lastName: new FormControl('', [Validators.required, latinOnly]),
       email: new FormControl('', [Validators.required, Validators.email]),
       nationality: new FormControl(''),
-      idCardNumber: new FormControl(''),
+      idCardNumber: new FormControl('', [latinOnly]),
     }),
     lear: new FormGroup({
-      firstName: new FormControl('', [Validators.required]),
-      lastName: new FormControl('', [Validators.required]),
+      firstName: new FormControl('', [Validators.required, latinOnly]),
+      lastName: new FormControl('', [Validators.required, latinOnly]),
       email: new FormControl('', [Validators.required, Validators.email]),
       nationality: new FormControl(''),
-      professionalAddress: new FormControl(''),
-      idCardNumber: new FormControl(''),
-      mobilePhone: new FormControl(''),
+      professionalAddress: new FormControl('', [latinOnly]),
+      idCardNumber: new FormControl('', [latinOnly]),
+      mobilePhone: new FormControl('', [latinOnly]),
       isAuthorised: new FormControl(false, [Validators.requiredTrue]),
     }),
     contractualDocuments: new FormGroup({

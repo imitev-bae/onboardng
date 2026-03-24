@@ -1,5 +1,6 @@
 import { Component, ViewEncapsulation, inject, ChangeDetectorRef } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { latinOnly } from './validators/latin-only.validator';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { LandingComponent } from './components/landing/landing.component';
@@ -46,18 +47,18 @@ export class OnboardingComponent {
     isCompany: new FormControl(false, [Validators.requiredTrue]),
     acceptTerms: new FormControl(false, [Validators.requiredTrue]),
     representative: new FormGroup({
-      firstName: new FormControl('', [Validators.required]),
-      lastName: new FormControl('', [Validators.required]),
+      firstName: new FormControl('', [Validators.required, latinOnly]),
+      lastName: new FormControl('', [Validators.required, latinOnly]),
       email: new FormControl('', [Validators.required, Validators.email]),
       isAuthorised: new FormControl(false, [Validators.requiredTrue]),
     }),
     company: new FormGroup({
-      legalName: new FormControl('', [Validators.required]),
-      vatNumber: new FormControl('', [Validators.required]),
+      legalName: new FormControl('', [Validators.required, latinOnly]),
+      vatNumber: new FormControl('', [Validators.required, latinOnly]),
       country: new FormControl('', [Validators.required]),
-      city: new FormControl('', [Validators.required]),
-      street: new FormControl('', [Validators.required]),
-      postalCode: new FormControl('', [Validators.required]),
+      city: new FormControl('', [Validators.required, latinOnly]),
+      street: new FormControl('', [Validators.required, latinOnly]),
+      postalCode: new FormControl('', [Validators.required, latinOnly]),
     }),
   });
 
