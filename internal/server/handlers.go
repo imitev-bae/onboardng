@@ -32,10 +32,12 @@ type RegistrationRequest struct {
 	Country       string `json:"country"`
 	VatId         string `json:"vatId"`
 	StreetAddress string `json:"streetAddress"`
+	City          string `json:"city"`
 	PostalCode    string `json:"postalCode"`
 	Email         string `json:"email"`
 	Code          string `json:"code"`
 	Website       string `json:"website"`
+	Role          string `json:"role"`
 }
 
 // SendJSON utility helper
@@ -175,6 +177,7 @@ func (s *Server) HandleValidateEmailCode(w http.ResponseWriter, r *http.Request)
 		Country:       regRecord.Country,
 		VatId:         regRecord.VatID,
 		StreetAddress: regRecord.StreetAddress,
+		City:          regRecord.City,
 		PostalCode:    regRecord.PostalCode,
 		Email:         regRecord.Email,
 	}
@@ -209,6 +212,9 @@ func (s *RegistrationRequest) Validate() error {
 	}
 	if s.StreetAddress == "" {
 		return fmt.Errorf("street address is required")
+	}
+	if s.City == "" {
+		return fmt.Errorf("city is required")
 	}
 	if s.PostalCode == "" {
 		return fmt.Errorf("postal code is required")
@@ -259,6 +265,10 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if requestData.Role == "" {
+		requestData.Role = "Buyer"
+	}
+
 	// Verify the code again to prevent spurious calls
 	if !s.VerifyCode(requestData.Email, requestData.Code) {
 		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
@@ -287,8 +297,6 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.DeleteVerificationCode(requestData.Email)
-
 	// Get an access token to authenticate in the Issuer and TM Forum APIs
 	token, err := s.Issuer.GetAccessToken()
 	if err != nil {
@@ -299,8 +307,9 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check in the TMF server if the organization already exists.
-	// In PRO, we reject registration if the organization already exists.
-	// In other environments, we continue with the registration, deleting the existing orgs.
+	// In PRO, we use the first organization found and continue with the registration.
+	// In other environments, we continue with the registration, deleting all orgs except the first.
+	var existingOrgID string
 	existingOrgs, _ := s.Issuer.TMFGetOrganizationByELSI(token, requestData.VatId)
 	if len(existingOrgs) > 0 {
 		slog.Info("Organization already exists in TMF server", "vatId", requestData.VatId)
@@ -308,13 +317,15 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		switch s.Runtime {
 
 		case configuration.Production:
-			s.SendJSON(w, r, http.StatusConflict, false, "Organization already exists in TMF server", nil)
-			return
+			slog.Info("Using the first organization found and continuing", "environment", s.Runtime)
+			existingOrgID = existingOrgs[0].ID
 
 		case configuration.Development, configuration.Preproduction:
-			slog.Info("Deleting all organizations found and continuing", "environment", s.Runtime)
-			// Delete all the organizations from the TMF server
-			for _, org := range existingOrgs {
+			slog.Info("Deleting all organizations except the first and continuing", "environment", s.Runtime)
+			existingOrgID = existingOrgs[0].ID
+			// Delete all organizations except the first one
+			for i := 1; i < len(existingOrgs); i++ {
+				org := existingOrgs[i]
 				if err := s.Issuer.TMFDeleteOrganization(token, org.ID); err != nil {
 					err = errl.Errorf("Failed to delete organization for registration: %v", err)
 					slog.Error("❌ Error deleting organization", "error", err)
@@ -367,7 +378,11 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		slog.Error("❌ Error performing issuance", "error", err)
 	}
 
-	err = updateTMForum(token, requestData, reg, s)
+	if existingOrgID != "" {
+		err = updateTMForumOrganization(token, existingOrgID, requestData, reg, s)
+	} else {
+		err = createTMForumOrganization(token, requestData, reg, s)
+	}
 	if err != nil {
 		slog.Error("❌ Error updating TM Forum", "error", err)
 		// Record the error in the database
@@ -396,7 +411,9 @@ func saveToDB(requestData RegistrationRequest, s *Server) (*db.RegistrationRecor
 		Country:        requestData.Country,
 		VatID:          requestData.VatId,
 		StreetAddress:  requestData.StreetAddress,
+		City:           requestData.City,
 		PostalCode:     requestData.PostalCode,
+		Role:           requestData.Role,
 	}
 
 	// Create an initial registration in the database, updated with error and status later
@@ -486,7 +503,7 @@ func performIssuance(token string, reg *db.RegistrationRecord, s *Server, reques
 	return nil
 }
 
-func updateTMForum(token string, requestData RegistrationRequest, reg *db.RegistrationRecord, s *Server) error {
+func createTMForumOrganization(token string, requestData RegistrationRequest, reg *db.RegistrationRecord, s *Server) error {
 
 	orgForm := credissuance.RegistrationRequest{
 		CompanyName:   requestData.CompanyName,
@@ -517,4 +534,141 @@ func updateTMForum(token string, requestData RegistrationRequest, reg *db.Regist
 		slog.Error("❌ Error updating registration status with TMF success", "error", err)
 	}
 	return nil
+}
+
+func updateTMForumOrganization(token string, id string, requestData RegistrationRequest, reg *db.RegistrationRecord, s *Server) error {
+
+	orgForm := credissuance.RegistrationRequest{
+		CompanyName:   requestData.CompanyName,
+		FirstName:     requestData.FirstName,
+		LastName:      requestData.LastName,
+		Email:         requestData.Email,
+		Country:       requestData.Country,
+		VatId:         requestData.VatId,
+		StreetAddress: requestData.StreetAddress,
+		PostalCode:    requestData.PostalCode,
+	}
+	updatedOrg := credissuance.TMFOrganizationUpdateFromRequest(orgForm)
+
+	_, err := s.Issuer.TMFUpdateOrganization(token, id, updatedOrg)
+	if err != nil {
+		err = errl.Errorf("Failed to update organization for registration: %v", err)
+		slog.Error("❌ Error updating organization", "error", err)
+		// Record the error in the database
+		_ = s.DB.SaveRegistrationLog(&db.RegistrationLog{
+			RegistrationID: reg.RegistrationID,
+			Type:           "error",
+			Message:        fmt.Sprintf("TM Forum update organization error: %v", err),
+		})
+		return err
+	}
+	reg.TMFRegistered = true
+	if err := s.DB.UpdateRegistrationStatus(reg); err != nil {
+		slog.Error("❌ Error updating registration status with TMF success", "error", err)
+	}
+	return nil
+}
+
+// RepresentativesRequest payload for updating LR and LEAR details
+type RepresentativesRequest struct {
+	VatID            string `json:"vatId"`
+	Email            string `json:"email"`
+	Code             string `json:"code"`
+	LRFirstName      string `json:"lrFirstName"`
+	LRLastName       string `json:"lrLastName"`
+	LREmail          string `json:"lrEmail"`
+	LRCountry        string `json:"lrCountry"`
+	LRIdCard         string `json:"lrIdCard"`
+	LEARFirstName    string `json:"learFirstName"`
+	LEARLastName     string `json:"learLastName"`
+	LEAREmail        string `json:"learEmail"`
+	LEARCountry      string `json:"learCountry"`
+	LEARAddress      string `json:"learAddress"`
+	LEARIdCard       string `json:"learIdCard"`
+	LEARMobileNumber string `json:"learMobileNumber"`
+	LEARCompleted    bool   `json:"learCompleted"`
+}
+
+// HandleUpdateRepresentatives handles updating the LR and LEAR info
+func (s *Server) HandleUpdateRepresentatives(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !validateCSRF(r) {
+		s.SendJSON(w, r, http.StatusForbidden, false, "Security check failed: missing CSRF header", nil)
+		return
+	}
+
+	var req RepresentativesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid request body", nil)
+		return
+	}
+
+	if req.VatID == "" {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "VAT ID is required", nil)
+		return
+	}
+	if req.Email == "" {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Email is required", nil)
+		return
+	}
+	if req.Code == "" {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Verification code is required", nil)
+		return
+	}
+
+	// Verify the code
+	if !s.VerifyCode(req.Email, req.Code) {
+		s.SendJSON(w, r, http.StatusBadRequest, false, "Invalid or expired verification code", nil)
+		return
+	}
+
+	// Delete verification code after successful use. In any case, it will expire in 1 hour.
+	s.DeleteVerificationCode(req.Email)
+
+	// Fetch registration and check if immutable
+	current, err := s.DB.GetRegistrationByVatID(req.VatID)
+	if err != nil {
+		s.SendJSON(w, r, http.StatusNotFound, false, "Registration not found", nil)
+		return
+	}
+	// Check if the email matches the registration email
+	if current.Email != strings.ToLower(req.Email) {
+		s.SendJSON(w, r, http.StatusForbidden, false, "Email does not match the registration", nil)
+		return
+	}
+	if current.Approved {
+		s.SendJSON(w, r, http.StatusForbidden, false, "Registration is already approved and immutable", nil)
+		return
+	}
+
+	// Update DB
+	repParams := &db.RegistrationRecord{
+		LRFirstName:      req.LRFirstName,
+		LRLastName:       req.LRLastName,
+		LREmail:          req.LREmail,
+		LRCountry:        req.LRCountry,
+		LRIdCard:         req.LRIdCard,
+		LEARFirstName:    req.LEARFirstName,
+		LEARLastName:     req.LEARLastName,
+		LEAREmail:        req.LEAREmail,
+		LEARCountry:      req.LEARCountry,
+		LEARAddress:      req.LEARAddress,
+		LEARIdCard:       req.LEARIdCard,
+		LEARMobileNumber: req.LEARMobileNumber,
+		LEARCompleted:    req.LEARCompleted,
+		Role:             "Seller",
+	}
+
+	err = s.DB.UpdateRepresentativesByVatID(req.VatID, repParams)
+	if err != nil {
+		slog.Error("❌ Error updating representatives", "error", err)
+		s.SendJSON(w, r, http.StatusInternalServerError, false, "Error updating registration", err.Error())
+		return
+	}
+
+	s.SendJSON(w, r, http.StatusOK, true, "Representatives updated successfully", nil)
 }

@@ -30,8 +30,8 @@ import (
 
 func Run() error {
 
-	// Define the main run command
-	runCmd := flag.NewFlagSet("run", flag.ExitOnError)
+	// Define the main serve command
+	runCmd := flag.NewFlagSet("serve", flag.ExitOnError)
 	runCfgPath := runCmd.String("config", "config.age", "Path to config file (.yaml or .age)")
 	watchFlag := runCmd.Bool("watch", false, "watch for changes and start server")
 	envFlag := runCmd.String("env", "dev", "environment to serve (dev, pre or pro)")
@@ -67,7 +67,7 @@ func Run() error {
 
 	// Route the Command
 	switch command {
-	case "run":
+	case "serve":
 		// Start the server
 		runCmd.Parse(cmdArgs)
 

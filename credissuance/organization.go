@@ -374,9 +374,11 @@ type RegistrationRequest struct {
 	Country       string `json:"country"`
 	VatId         string `json:"vatId"`
 	StreetAddress string `json:"streetAddress"`
+	City          string `json:"city"`
 	PostalCode    string `json:"postalCode"`
 	Email         string `json:"email"`
 	Code          string `json:"code"`
+	Role          string `json:"role"`
 }
 
 var accessToken = "eyJraWQiOiJkaWQ6a2V5OnpEbmFldk44NVo3VkpnY0JvUWVxUVU3ZDhrWnB1VmhEU2RtOGhRdEpZV2p2ZWszVkwiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJodHRwczovL3ZlcmlmaWVyLmRvbWUtbWFya2V0cGxhY2Utc2J4Lm9yZyIsInN1YiI6ImRpZDprZXk6ekRuYWVhanczRm1NZ3NHSnhXZ2dNTGJYRmdyN3lvZVRCS0JzUEFkRXJiTHBTRkxadCIsInNjb3BlIjoibWFjaGluZSBsZWFyY3JlZGVudGlhbCIsImlzcyI6Imh0dHBzOi8vdmVyaWZpZXIuZG9tZS1tYXJrZXRwbGFjZS1zYngub3JnIiwiZXhwIjoxNzcyNzc4NjQ2LCJpYXQiOjE3NzI3NzUwNDYsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy9ucy9jcmVkZW50aWFscy92MiIsImh0dHBzOi8vY3JlZGVudGlhbHMuZXVkaXN0YWNrLmV1Ly53ZWxsLWtub3duL2NyZWRlbnRpYWxzL2xlYXJfY3JlZGVudGlhbF9tYWNoaW5lL3czYy92MiJdLCJjcmVkZW50aWFsU3RhdHVzIjp7ImlkIjoiaHR0cHM6Ly9pc3N1ZXIuZG9tZS1tYXJrZXRwbGFjZS1zYngub3JnL3czYy92MS9jcmVkZW50aWFscy9zdGF0dXMvMSM5NDMyMyIsInN0YXR1c0xpc3RDcmVkZW50aWFsIjoiaHR0cHM6Ly9pc3N1ZXIuZG9tZS1tYXJrZXRwbGFjZS1zYngub3JnL3czYy92MS9jcmVkZW50aWFscy9zdGF0dXMvMSIsInN0YXR1c0xpc3RJbmRleCI6Ijk0MzIzIiwic3RhdHVzUHVycG9zZSI6InJldm9jYXRpb24iLCJ0eXBlIjoiQml0c3RyaW5nU3RhdHVzTGlzdEVudHJ5In0sImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoiZGlkOmtleTp6RG5hZWFqdzNGbU1nc0dKeFdnZ01MYlhGZ3I3eW9lVEJLQnNQQWRFcmJMcFNGTFp0IiwibWFuZGF0ZSI6eyJtYW5kYXRlZSI6eyJkb21haW4iOiJ0bWYuc2J4LmV2aWRlbmNlbGVkZ2VyLmV1IiwiaWQiOiJkaWQ6a2V5OnpEbmFlYWp3M0ZtTWdzR0p4V2dnTUxiWEZncjd5b2VUQktCc1BBZEVyYkxwU0ZMWnQiLCJpcEFkZHJlc3MiOiIyMTIuMjI3LjYxLjIwNiJ9LCJtYW5kYXRvciI6eyJjb21tb25OYW1lIjoiQ29uc3RhbnRpbm8gRmVybsOhbmRleiIsImNvdW50cnkiOiJFUyIsImVtYWlsIjoiZXhhbXBsZUBleGFtcGxlLm9yZyIsImlkIjoiZGlkOmVsc2k6VkFURVMtQTE1NDU2NTg1Iiwib3JnYW5pemF0aW9uIjoiQUxUSUEgQ09OU1VMVE9SRVMgU0EiLCJvcmdhbml6YXRpb25JZGVudGlmaWVyIjoiVkFURVMtQTE1NDU2NTg1Iiwic2VyaWFsTnVtYmVyIjoiMzI3NzEzODVMIn0sInBvd2VyIjpbeyJhY3Rpb24iOlsiRXhlY3V0ZSJdLCJkb21haW4iOiJET01FIiwiZnVuY3Rpb24iOiJPbmJvYXJkaW5nIiwidHlwZSI6ImRvbWFpbiJ9XX19LCJpZCI6InVybjp1dWlkOjg5MzEzOWU0LTE2YjgtNGFjZS1hN2QzLWZjNWNhMjkyYWY3ZCIsImlzc3VlciI6eyJjb21tb25OYW1lIjoiU2VhbCBTaWduYXR1cmUgQ3JlZGVudGlhbHMgaW4gU0JYIGZvciB0ZXN0aW5nIiwiY291bnRyeSI6IkVTIiwiaWQiOiJkaWQ6ZWxzaTpWQVRFUy1CNjA2NDU5MDAiLCJvcmdhbml6YXRpb24iOiJJTjIiLCJvcmdhbml6YXRpb25JZGVudGlmaWVyIjoiVkFURVMtQjYwNjQ1OTAwIiwic2VyaWFsTnVtYmVyIjoiQjQ3NDQ3NTYwIn0sInR5cGUiOlsiTEVBUkNyZWRlbnRpYWxNYWNoaW5lIiwiVmVyaWZpYWJsZUNyZWRlbnRpYWwiXSwidmFsaWRGcm9tIjoiMjAyNi0wMi0yMFQxMzowNjo1My4yMDMzMzQ3NDNaIiwidmFsaWRVbnRpbCI6IjIwMjctMDItMjBUMTM6MDY6NTMuMjAzMzM0NzQzWiJ9LCJqdGkiOiJjMWM1ZTVjZS04YzE2LTRmMzMtYTdkYy05NTQ3YjZkNTI1NTEiLCJjbGllbnRfaWQiOiJodHRwczovL3ZlcmlmaWVyLmRvbWUtbWFya2V0cGxhY2Utc2J4Lm9yZyJ9.AmlnDNComKFujzyuqwXCE_JkpE7r0gGsO-3pCtp3CNK2tcRcFYPkyzej8DR9LCpGtoDg8fytDkVOjwqn0QwNBw"
@@ -477,10 +479,17 @@ func TMFOrganizationFromRequest(requestData RegistrationRequest) *Organization_C
 	org.TradingName = requestData.CompanyName
 	org.OrganizationType = "company"
 
+	// Determine the organizationIdentifier from the VatId.
+	// We have to add the prefix 'did:elsi:' if it already doe snot have it
+	organizationIdentifier := requestData.VatId
+	if !strings.HasPrefix(requestData.VatId, "did:elsi:") {
+		organizationIdentifier = "did:elsi:" + requestData.VatId
+	}
+
 	org.OrganizationIdentification = []OrganizationIdentification{
 		{
 			Type:               "organizationIdentification",
-			IdentificationID:   requestData.VatId,
+			IdentificationID:   organizationIdentifier,
 			IdentificationType: "elsi", // ETSI Legal person Semantic Identifier, as in eIDAS certificates
 			IssuingAuthority:   "eIDAS",
 		},
@@ -505,6 +514,7 @@ func TMFOrganizationFromRequest(requestData RegistrationRequest) *Organization_C
 			MediumType: "postalAddress",
 			Characteristic: &MediumCharacteristic{
 				Street1:  requestData.StreetAddress,
+				City:     requestData.City,
 				PostCode: requestData.PostalCode,
 				Country:  requestData.Country,
 			},
@@ -515,6 +525,73 @@ func TMFOrganizationFromRequest(requestData RegistrationRequest) *Organization_C
 		{
 			Name:      "country",
 			Value:     requestData.Country,
+			ValueType: "string",
+		},
+		{
+			Name:      "role",
+			Value:     requestData.Role,
+			ValueType: "string",
+		},
+	}
+
+	return &org
+}
+
+func TMFOrganizationUpdateFromRequest(requestData RegistrationRequest) *Organization_Update {
+	org := Organization_Update{}
+	org.Type = "organization"
+	org.Name = requestData.CompanyName
+	org.Status = "initialized"
+
+	org.IsHeadOffice = true
+	org.IsLegalEntity = true
+	org.TradingName = requestData.CompanyName
+	org.OrganizationType = "company"
+
+	org.OrganizationIdentification = []OrganizationIdentification{
+		{
+			Type:               "organizationIdentification",
+			IdentificationID:   requestData.VatId,
+			IdentificationType: "elsi",
+			IssuingAuthority:   "eIDAS",
+		},
+	}
+
+	org.ExternalReference = []ExternalReference{
+		{
+			ExternalReferenceType: "idm_id",
+			Name:                  requestData.VatId,
+		},
+	}
+
+	org.ContactMedium = []ContactMedium{
+		{
+			MediumType: "email",
+			Preferred:  true,
+			Characteristic: &MediumCharacteristic{
+				EmailAddress: requestData.Email,
+			},
+		},
+		{
+			MediumType: "postalAddress",
+			Characteristic: &MediumCharacteristic{
+				Street1:  requestData.StreetAddress,
+				City:     requestData.City,
+				PostCode: requestData.PostalCode,
+				Country:  requestData.Country,
+			},
+		},
+	}
+
+	org.PartyCharacteristic = []Characteristic{
+		{
+			Name:      "country",
+			Value:     requestData.Country,
+			ValueType: "string",
+		},
+		{
+			Name:      "role",
+			Value:     requestData.Role,
 			ValueType: "string",
 		},
 	}
@@ -583,8 +660,8 @@ func (l *LEARIssuance) TMFRetrieveOrganization(accessToken string, id string, fi
 	return &org, nil
 }
 
-// TMFPatchOrganization partially updates a Organization.
-func (l *LEARIssuance) TMFPatchOrganization(accessToken string, id string, org *Organization_Update) (*Organization, error) {
+// TMFUpdateOrganization partially updates a Organization.
+func (l *LEARIssuance) TMFUpdateOrganization(accessToken string, id string, org *Organization_Update) (*Organization, error) {
 	buf, err := json.Marshal(org)
 	if err != nil {
 		return nil, errl.Errorf("error marshalling request body: %w", err)

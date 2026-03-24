@@ -16,6 +16,8 @@ type MockDB struct {
 	GetRegistrationLogsFunc           func(limit, offset int) ([]db.RegistrationLog, error)
 	GetRegistrationFilesFunc          func(limit, offset int) ([]db.RegistrationFile, error)
 	GetRegistrationFileFunc           func(fileID string) (*db.RegistrationFile, error)
+	GetRegistrationByIDFunc           func(registrationID string) (*db.RegistrationRecord, error)
+	UpdateRepresentativesByVatIDFunc  func(vatID string, rep *db.RegistrationRecord) error
 }
 
 func (m *MockDB) SaveRegistration(reg *db.RegistrationRecord) error {
@@ -48,6 +50,12 @@ func (m *MockDB) GetRegistrationFiles(limit, offset int) ([]db.RegistrationFile,
 func (m *MockDB) GetRegistrationFile(fileID string) (*db.RegistrationFile, error) {
 	return m.GetRegistrationFileFunc(fileID)
 }
+func (m *MockDB) GetRegistrationByID(registrationID string) (*db.RegistrationRecord, error) {
+	return m.GetRegistrationByIDFunc(registrationID)
+}
+func (m *MockDB) UpdateRepresentativesByVatID(vatID string, rep *db.RegistrationRecord) error {
+	return m.UpdateRepresentativesByVatIDFunc(vatID, rep)
+}
 
 type MockMail struct {
 	SendVerificationCodeFunc func(email string, code string) error
@@ -71,6 +79,7 @@ type MockIssuance struct {
 	TMFDeleteOrganizationFunc    func(accessToken string, id string) error
 	LEARIssuanceRequestFunc      func(accessToken string, learCredData *credissuance.LEARIssuanceRequestBody) ([]byte, error)
 	TMFCreateOrganizationFunc    func(accessToken string, org *credissuance.Organization_Create) (*credissuance.Organization, error)
+	TMFUpdateOrganizationFunc    func(accessToken string, id string, org *credissuance.Organization_Update) (*credissuance.Organization, error)
 }
 
 func (m *MockIssuance) GetAccessToken() (string, error) {
@@ -87,4 +96,7 @@ func (m *MockIssuance) LEARIssuanceRequest(accessToken string, learCredData *cre
 }
 func (m *MockIssuance) TMFCreateOrganization(accessToken string, org *credissuance.Organization_Create) (*credissuance.Organization, error) {
 	return m.TMFCreateOrganizationFunc(accessToken, org)
+}
+func (m *MockIssuance) TMFUpdateOrganization(accessToken string, id string, org *credissuance.Organization_Update) (*credissuance.Organization, error) {
+	return m.TMFUpdateOrganizationFunc(accessToken, id, org)
 }
