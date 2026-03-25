@@ -8,6 +8,7 @@ import { TermsComponent } from '../components/terms/terms.component';
 import { RepresentativeComponent } from '../components/representative/representative.component';
 import { CompanyInfoComponent } from '../components/company-info/company-info.component';
 import { EmailVerificationComponent } from '../components/email-verification/email-verification.component';
+import { ROLES } from '../constants';
 import { ProviderSuccessComponent } from './components/success/provider-success.component';
 
 @Component({
@@ -215,6 +216,7 @@ export class OnboardingProviderComponent {
       streetAddress: company.street,
       postalCode: company.postalCode,
       code: this.verifiedCode,
+      role: ROLES.SELLER,
     };
 
     this.http.post<any>('/api/register', body, { headers })
